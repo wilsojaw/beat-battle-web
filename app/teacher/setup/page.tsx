@@ -1,0 +1,268 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { io, Socket } from 'socket.io-client';
+import type { GameConfig, NoteValue } from '@/types/game';
+import { NOTE_VALUES } from '@/types/game';
+
+let socket: Socket;
+
+export default function TeacherSetup() {
+  const router = useRouter();
+  const [teacherName, setTeacherName] = useState('');
+  const [tempo, setTempo] = useState(100);
+  const [selectedNotes, setSelectedNotes] = useState<NoteValue[]>(['quarter', 'eighth', 'half']);
+  const [segmentDuration, setSegmentDuration] = useState(4); // bars
+  const [totalDuration, setTotalDuration] = useState(120); // seconds
+  const [leaderboardStyle, setLeaderboardStyle] = useState<'full' | 'top3' | 'stars-only'>('full');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const noteOptions: NoteValue[] = ['quarter', 'half', 'whole', 'eighth', 'dotted-quarter', 'dotted-eighth', 'sixteenth'];
+
+  const toggleNote = (note: NoteValue) => {
+    if (selectedNotes.includes(note)) {
+      // Must have at least one note selected
+      if (selectedNotes.length > 1) {
+        setSelectedNotes(selectedNotes.filter(n => n !== note));
+      }
+    } else {
+      setSelectedNotes([...selectedNotes, note]);
+    }
+  };
+
+  const createGame = async () => {
+    if (!teacherName.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+
+    if (selectedNotes.length === 0) {
+      setError('Please select at least one note value');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Connect to Socket.io server
+      socket = io();
+
+      const config: GameConfig = {
+        tempo,
+        noteValues: selectedNotes,
+        segmentDuration,
+        totalDuration,
+        scoringProfile: 'accuracy-only',
+        leaderboardStyle
+      };
+
+      socket.emit('create-game', { teacherName: teacherName.trim(), config }, (response: any) => {
+        if (response.success) {
+          // Store game state in sessionStorage
+          sessionStorage.setItem('roomCode', response.roomCode);
+          sessionStorage.setItem('teacherName', teacherName.trim());
+          sessionStorage.setItem('isTeacher', 'true');
+
+          // Navigate to lobby
+          router.push(`/teacher/lobby?code=${response.roomCode}`);
+        } else {
+          setError('Failed to create game. Please try again.');
+          setLoading(false);
+        }
+      });
+    } catch (err) {
+      setError('Connection error. Please check your internet connection.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-2xl p-8">
+          <h1 className="text-4xl font-bold text-purple-600 mb-2">🎓 Teacher Setup</h1>
+          <p className="text-gray-600 mb-8">Configure your Beat Battle game</p>
+
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-6">
+            {/* Teacher Name */}
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-2">
+                Your Name
+              </label>
+              <input
+                type="text"
+                value={teacherName}
+                onChange={(e) => setTeacherName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none text-lg text-gray-900 placeholder:text-gray-400"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Tempo */}
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-2">
+                Tempo (BPM) - ♩ = {tempo}
+              </label>
+              <input
+                type="range"
+                min="60"
+                max="180"
+                step="5"
+                value={tempo}
+                onChange={(e) => setTempo(parseInt(e.target.value))}
+                className="w-full h-3 bg-purple-200 rounded-lg appearance-none cursor-pointer"
+                disabled={loading}
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>60 (Slow)</span>
+                <span>180 (Fast)</span>
+              </div>
+            </div>
+
+            {/* Note Values */}
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-3">
+                Note Values to Use
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {noteOptions.map((note) => (
+                  <button
+                    key={note}
+                    onClick={() => toggleNote(note)}
+                    disabled={loading}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      selectedNotes.includes(note)
+                        ? 'bg-purple-500 border-purple-600 text-white'
+                        : 'bg-white border-gray-300 text-gray-700 hover:border-purple-400'
+                    }`}
+                  >
+                    <div className="text-3xl mb-1">{NOTE_VALUES[note].symbol}</div>
+                    <div className="text-sm font-medium">{NOTE_VALUES[note].displayName}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Segment Duration */}
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-2">
+                Segment Duration - {segmentDuration} bars
+              </label>
+              <input
+                type="range"
+                min="2"
+                max="8"
+                step="2"
+                value={segmentDuration}
+                onChange={(e) => setSegmentDuration(parseInt(e.target.value))}
+                className="w-full h-3 bg-pink-200 rounded-lg appearance-none cursor-pointer"
+                disabled={loading}
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>2 bars</span>
+                <span>8 bars</span>
+              </div>
+            </div>
+
+            {/* Total Duration */}
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-2">
+                Total Game Length - {totalDuration} seconds ({Math.floor(totalDuration / 60)}:{(totalDuration % 60).toString().padStart(2, '0')})
+              </label>
+              <input
+                type="range"
+                min="60"
+                max="300"
+                step="30"
+                value={totalDuration}
+                onChange={(e) => setTotalDuration(parseInt(e.target.value))}
+                className="w-full h-3 bg-red-200 rounded-lg appearance-none cursor-pointer"
+                disabled={loading}
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>1 min</span>
+                <span>5 min</span>
+              </div>
+            </div>
+
+            {/* Leaderboard Style */}
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-3">
+                Leaderboard Style
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <button
+                  onClick={() => setLeaderboardStyle('full')}
+                  disabled={loading}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    leaderboardStyle === 'full'
+                      ? 'bg-purple-500 border-purple-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-700 hover:border-purple-400'
+                  }`}
+                >
+                  <div className="font-semibold">Full Leaderboard</div>
+                  <div className="text-sm mt-1 opacity-80">Show all rankings</div>
+                </button>
+
+                <button
+                  onClick={() => setLeaderboardStyle('top3')}
+                  disabled={loading}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    leaderboardStyle === 'top3'
+                      ? 'bg-purple-500 border-purple-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-700 hover:border-purple-400'
+                  }`}
+                >
+                  <div className="font-semibold">Top 3 Only</div>
+                  <div className="text-sm mt-1 opacity-80">Show podium</div>
+                </button>
+
+                <button
+                  onClick={() => setLeaderboardStyle('stars-only')}
+                  disabled={loading}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    leaderboardStyle === 'stars-only'
+                      ? 'bg-purple-500 border-purple-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-700 hover:border-purple-400'
+                  }`}
+                >
+                  <div className="font-semibold">Stars Only</div>
+                  <div className="text-sm mt-1 opacity-80">No ranking shown</div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="mt-8 flex gap-4">
+            <button
+              onClick={() => router.push('/')}
+              disabled={loading}
+              className="flex-1 px-6 py-4 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              onClick={createGame}
+              disabled={loading || !teacherName.trim()}
+              className="flex-1 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Creating Game...' : 'Start Lobby'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
