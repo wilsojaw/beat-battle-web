@@ -75,8 +75,11 @@ export type ScoringProfile = 'accuracy-only' | 'accuracy-with-streak';
 export interface GameConfig {
   tempo: number; // BPM
   noteValues: NoteValue[];
-  segmentDuration: number; // in bars
-  totalDuration: number; // in seconds
+  segmentDuration: number; // in measures (how many measures per note value)
+  totalDuration: number; // in seconds (deprecated - use totalMeasures)
+  totalMeasures?: number; // total measures in the game
+  measuresPerSegment?: number; // how many measures per segment (same as segmentDuration)
+  showNextNote?: boolean; // show next note preview to students
   scoringProfile: ScoringProfile;
   leaderboardStyle: LeaderboardStyle;
   songName?: string;
@@ -103,6 +106,8 @@ export interface GameSegment {
   startTime: number;
   endTime: number;
   durationBars: number;
+  startMeasure?: number; // 1-indexed measure number for display
+  endMeasure?: number;
 }
 
 export interface GameState {

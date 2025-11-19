@@ -20,31 +20,60 @@ function GameContent() {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [playerTaps, setPlayerTaps] = useState<Map<string, number>>(new Map());
   const [totalTaps, setTotalTaps] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
 
   const gameStartTimeRef = useRef<number>(0);
   const configRef = useRef<GameConfig | null>(null);
+  const beatLogIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleGameStart = async (data: {
     startTime: number;
     segments: GameSegment[];
     currentSegment: GameSegment;
   }) => {
-    console.log('handleGameStart called with:', data);
+    // Dispose any existing rhythm engine first
+    if (rhythmEngine) {
+      rhythmEngine.dispose();
+      rhythmEngine = null;
+    }
 
     // Initialize rhythm engine
     rhythmEngine = new RhythmEngine(100);
     await rhythmEngine.init();
 
-    gameStartTimeRef.current = Date.now();
+    // Teacher is the source of truth for time
+    gameStartTimeRef.current = data.startTime;
+
+    console.log('🎓 TEACHER GAME START:', JSON.stringify({
+      serverStartTime: data.startTime,
+      currentTime: Date.now(),
+      segmentCount: data.segments.length
+    }, null, 2));
+
     setSegments(data.segments);
     setCurrentSegmentIndex(0);
     setIsPlaying(true);
 
-    // Start metronome
+    // Start metronome (teacher hears it, broadcasts to headphones)
+    // Students navigate to game page at countdown=1, so they should be ready by now
     rhythmEngine.startMetronome();
     rhythmEngine.start();
+
+    // Log metronome beats
+    let beatCount = 0;
+    const beatInterval = (60 / 100) * 1000; // 100 BPM = 600ms per beat
+    const logBeats = setInterval(() => {
+      if (!isPlaying) {
+        clearInterval(logBeats);
+        return;
+      }
+      beatCount++;
+      const beatTime = Date.now() - data.startTime;
+      console.log(`🥁 BEAT ${beatCount}: ${beatTime.toFixed(2)}ms since start`);
+    }, beatInterval);
 
     // Start countdown timer
     startCountdown(data.segments);
@@ -68,13 +97,13 @@ function GameContent() {
       socket = io();
     }
 
-    console.log('Teacher game page - socket connected:', socket.connected, 'socket id:', socket.id);
+    // Rejoin room and request game state when socket connects
+    const rejoinAndRequestState = () => {
+      // First rejoin to update teacher socket ID
+      socket.emit('teacher-rejoin', { roomCode });
 
-    // Request game state when socket connects
-    const requestGameState = () => {
-      console.log('Requesting game state for room:', roomCode);
+      // Then request game state
       socket.emit('get-game-state', { roomCode }, (response: any) => {
-        console.log('Got game state response:', response);
         if (response.success && response.game.status === 'playing') {
           handleGameStart({
             startTime: response.game.startTime,
@@ -85,15 +114,22 @@ function GameContent() {
       });
     };
 
-    // If socket is already connected, request immediately
+    // If socket is already connected, rejoin and request immediately
     if (socket.connected) {
-      requestGameState();
+      rejoinAndRequestState();
     }
 
     // Also listen for connect event in case socket isn't connected yet
     socket.on('connect', () => {
-      console.log('Socket connected, requesting game state');
-      requestGameState();
+      rejoinAndRequestState();
+    });
+
+    socket.on('countdown-start', (data: { countdown: number }) => {
+      setCountdown(data.countdown);
+    });
+
+    socket.on('countdown-tick', (data: { countdown: number }) => {
+      setCountdown(data.countdown);
     });
 
     socket.on('game-started', async (data: {
@@ -101,7 +137,7 @@ function GameContent() {
       segments: GameSegment[];
       currentSegment: GameSegment;
     }) => {
-      console.log('game-started event received!', data);
+      setCountdown(null);
       handleGameStart(data);
     });
 
@@ -119,10 +155,31 @@ function GameContent() {
       setTotalTaps(prev => prev + 1);
     });
 
+    socket.on('game-ended', (data: any) => {
+      router.push(`/teacher/results?code=${roomCode}`);
+    });
+
+    // Listen for student sync logs
+    socket.on('student-sync-log', (data: any) => {
+      console.log(`📱 ${data.playerName} - GAME START SYNC:`, JSON.stringify(data.data, null, 2));
+    });
+
+    // Listen for student tap logs
+    socket.on('student-tap-log', (data: any) => {
+      console.log(`📱 ${data.playerName} - TAP:`, JSON.stringify(data.data, null, 2));
+    });
+
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
+      // Remove all event listeners to prevent duplicates
+      socket.off('connect');
+      socket.off('countdown-start');
+      socket.off('countdown-tick');
+      socket.off('game-started');
+      socket.off('game-ended');
+      socket.off('player-joined');
+      socket.off('player-left');
+      socket.off('student-tap-log');
+
       if (rhythmEngine) {
         rhythmEngine.dispose();
       }
@@ -163,9 +220,12 @@ function GameContent() {
     if (rhythmEngine) {
       rhythmEngine.stop();
     }
+    if (beatLogIntervalRef.current) {
+      clearInterval(beatLogIntervalRef.current);
+    }
 
     socket.emit('end-game', { roomCode });
-    router.push(`/teacher/results?code=${roomCode}`);
+    // Navigation will happen when we receive the game-ended event
   };
 
   const pauseGame = () => {
@@ -189,6 +249,25 @@ function GameContent() {
       socket.emit('change-segment', { roomCode, segmentIndex: newIndex });
     }
   };
+
+  const toggleMute = () => {
+    if (rhythmEngine) {
+      const newMutedState = rhythmEngine.toggleMute();
+      setIsMuted(newMutedState);
+    }
+  };
+
+  if (countdown !== null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="text-[300px] font-bold leading-none">
+            {countdown === 0 ? 'GO!' : countdown}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isPlaying || segments.length === 0) {
     return (
@@ -310,7 +389,7 @@ function GameContent() {
 
         {/* Control Buttons */}
         <div className="mt-6 bg-white rounded-xl shadow-lg p-6">
-          <div className="flex gap-4">
+          <div className="flex gap-4 mb-4">
             {!isPaused ? (
               <button
                 onClick={pauseGame}
@@ -340,6 +419,19 @@ function GameContent() {
               className="flex-1 px-6 py-4 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-colors"
             >
               🏁 End Game
+            </button>
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={toggleMute}
+              className={`flex-1 px-6 py-4 rounded-xl font-semibold transition-colors ${
+                isMuted
+                  ? 'bg-gray-400 text-white hover:bg-gray-500'
+                  : 'bg-purple-500 text-white hover:bg-purple-600'
+              }`}
+            >
+              {isMuted ? '🔇 Unmute Metronome' : '🔊 Mute Metronome'}
             </button>
           </div>
         </div>

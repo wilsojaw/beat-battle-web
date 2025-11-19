@@ -11,6 +11,8 @@ export class RhythmEngine {
   private currentNoteValue: NoteValue = 'quarter';
   private beatCallbacks: Array<(beat: number) => void> = [];
   private startTime: number = 0;
+  private metronomeSynth: Tone.MembraneSynth | null = null;
+  private isMuted: boolean = false;
 
   constructor(tempo: number) {
     this.tempo = tempo;
@@ -21,7 +23,6 @@ export class RhythmEngine {
   async init() {
     // Start Tone.js audio context (must be triggered by user interaction)
     await Tone.start();
-    console.log('Audio context started');
   }
 
   setTempo(tempo: number) {
@@ -37,13 +38,19 @@ export class RhythmEngine {
     this.startTime = Tone.now();
     this.transport.start();
     this.isPlaying = true;
-    console.log('Rhythm engine started at', this.startTime);
   }
 
   stop() {
     this.transport.stop();
+    this.transport.cancel(); // Cancel all scheduled events
     this.isPlaying = false;
     this.beatCallbacks = [];
+
+    // Dispose of metronome synth to prevent reuse errors
+    if (this.metronomeSynth) {
+      this.metronomeSynth.dispose();
+      this.metronomeSynth = null;
+    }
   }
 
   pause() {
@@ -89,35 +96,31 @@ export class RhythmEngine {
     return expectedTimes;
   }
 
-  // Calculate accuracy of a tap
-  calculateTapAccuracy(tapTime: number, expectedTimes: number[]): {
+  // Calculate accuracy of a tap based on interval from previous tap
+  calculateTapAccuracy(
+    tapTime: number,
+    previousTapTime: number | null,
+    expectedInterval: number
+  ): {
     accuracy: number;
-    nearestExpected: number;
+    interval: number;
     isAccurate: boolean;
   } {
-    if (expectedTimes.length === 0) {
-      return { accuracy: 0, nearestExpected: 0, isAccurate: false };
+    // First tap in a segment - no previous tap to compare
+    if (previousTapTime === null) {
+      return { accuracy: 0, interval: 0, isAccurate: true };
     }
 
-    // Find the nearest expected time
-    let nearestExpected = expectedTimes[0];
-    let minDiff = Math.abs(tapTime - expectedTimes[0]);
+    // Calculate actual interval between this tap and previous tap
+    const actualInterval = tapTime - previousTapTime;
 
-    for (const expectedTime of expectedTimes) {
-      const diff = Math.abs(tapTime - expectedTime);
-      if (diff < minDiff) {
-        minDiff = diff;
-        nearestExpected = expectedTime;
-      }
-    }
+    // Calculate how far off from expected interval
+    const accuracy = actualInterval - expectedInterval;
 
-    // Calculate accuracy in milliseconds
-    const accuracy = tapTime - nearestExpected;
+    // Consider accurate if within 150ms of expected interval (generous for kids)
+    const isAccurate = Math.abs(accuracy) < 150;
 
-    // Consider accurate if within 100ms window
-    const isAccurate = Math.abs(accuracy) < 100;
-
-    return { accuracy, nearestExpected, isAccurate };
+    return { accuracy, interval: actualInterval, isAccurate };
   }
 
   // Play a metronome click
@@ -127,13 +130,49 @@ export class RhythmEngine {
     synth.triggerAttackRelease('C2', '16n');
   }
 
-  // Play a metronome pattern
+  // Play a metronome pattern with accented downbeats
   startMetronome() {
-    const synth = new Tone.MembraneSynth().toDestination();
+    this.metronomeSynth = new Tone.MembraneSynth({
+      volume: 0
+    }).toDestination();
+
+    let beatCount = 0;
 
     this.transport.scheduleRepeat((time) => {
-      synth.triggerAttackRelease('C2', '32n', time);
+      if (this.metronomeSynth) {
+        // Every 4th beat (downbeat) is higher pitch and louder
+        const isDownbeat = beatCount % 4 === 0;
+        const pitch = isDownbeat ? 'C3' : 'C2';  // Higher pitch for downbeat
+
+        this.metronomeSynth.triggerAttackRelease(pitch, '32n', time);
+      }
+      beatCount++;
     }, '4n');
+  }
+
+  // Mute/unmute the metronome
+  muteMetronome() {
+    this.isMuted = true;
+    if (this.metronomeSynth) {
+      this.metronomeSynth.volume.value = -Infinity;
+    }
+  }
+
+  unmuteMetronome() {
+    this.isMuted = false;
+    if (this.metronomeSynth) {
+      this.metronomeSynth.volume.value = 0;
+    }
+  }
+
+  toggleMute() {
+    this.isMuted = !this.isMuted;
+    if (this.isMuted) {
+      this.muteMetronome();
+    } else {
+      this.unmuteMetronome();
+    }
+    return this.isMuted;
   }
 
   // Load and play a song
@@ -154,6 +193,9 @@ export class RhythmEngine {
     this.stop();
     if (this.metronome) {
       this.metronome.dispose();
+    }
+    if (this.metronomeSynth) {
+      this.metronomeSynth.dispose();
     }
   }
 }

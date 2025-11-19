@@ -13,8 +13,9 @@ export default function TeacherSetup() {
   const [teacherName, setTeacherName] = useState('');
   const [tempo, setTempo] = useState(100);
   const [selectedNotes, setSelectedNotes] = useState<NoteValue[]>(['quarter', 'eighth', 'half']);
-  const [segmentDuration, setSegmentDuration] = useState(4); // bars
-  const [totalDuration, setTotalDuration] = useState(120); // seconds
+  const [totalMeasures, setTotalMeasures] = useState(16);
+  const [measuresPerSegment, setMeasuresPerSegment] = useState(2);
+  const [showNextNote, setShowNextNote] = useState(true);
   const [leaderboardStyle, setLeaderboardStyle] = useState<'full' | 'top3' | 'stars-only'>('full');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -53,8 +54,11 @@ export default function TeacherSetup() {
       const config: GameConfig = {
         tempo,
         noteValues: selectedNotes,
-        segmentDuration,
-        totalDuration,
+        segmentDuration: measuresPerSegment,
+        totalDuration: 0, // Not used anymore
+        totalMeasures,
+        measuresPerSegment,
+        showNextNote,
         scoringProfile: 'accuracy-only',
         leaderboardStyle
       };
@@ -153,45 +157,78 @@ export default function TeacherSetup() {
               </div>
             </div>
 
-            {/* Segment Duration */}
+            {/* Total Measures */}
             <div>
               <label className="block text-lg font-semibold text-gray-700 mb-2">
-                Segment Duration - {segmentDuration} bars
+                Total Measures - {totalMeasures}
               </label>
               <input
                 type="range"
-                min="2"
-                max="8"
-                step="2"
-                value={segmentDuration}
-                onChange={(e) => setSegmentDuration(parseInt(e.target.value))}
+                min="4"
+                max="32"
+                step="4"
+                value={totalMeasures}
+                onChange={(e) => setTotalMeasures(parseInt(e.target.value))}
                 className="w-full h-3 bg-pink-200 rounded-lg appearance-none cursor-pointer"
                 disabled={loading}
               />
               <div className="flex justify-between text-sm text-gray-600 mt-1">
-                <span>2 bars</span>
-                <span>8 bars</span>
+                <span>4 measures</span>
+                <span>32 measures</span>
               </div>
             </div>
 
-            {/* Total Duration */}
+            {/* Measures Per Segment */}
             <div>
               <label className="block text-lg font-semibold text-gray-700 mb-2">
-                Total Game Length - {totalDuration} seconds ({Math.floor(totalDuration / 60)}:{(totalDuration % 60).toString().padStart(2, '0')})
+                Measures Per Note Value - {measuresPerSegment}
               </label>
               <input
                 type="range"
-                min="60"
-                max="300"
-                step="30"
-                value={totalDuration}
-                onChange={(e) => setTotalDuration(parseInt(e.target.value))}
-                className="w-full h-3 bg-red-200 rounded-lg appearance-none cursor-pointer"
+                min="1"
+                max="8"
+                step="1"
+                value={measuresPerSegment}
+                onChange={(e) => setMeasuresPerSegment(parseInt(e.target.value))}
+                className="w-full h-3 bg-blue-200 rounded-lg appearance-none cursor-pointer"
                 disabled={loading}
               />
               <div className="flex justify-between text-sm text-gray-600 mt-1">
-                <span>1 min</span>
-                <span>5 min</span>
+                <span>1 measure</span>
+                <span>8 measures</span>
+              </div>
+            </div>
+
+            {/* Show Next Note */}
+            <div>
+              <label className="block text-lg font-semibold text-gray-700 mb-3">
+                Show Next Note Preview
+              </label>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowNextNote(true)}
+                  disabled={loading}
+                  className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                    showNextNote
+                      ? 'bg-green-500 border-green-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-700 hover:border-green-400'
+                  }`}
+                >
+                  <div className="font-semibold">Show</div>
+                  <div className="text-sm mt-1 opacity-80">Easier for students</div>
+                </button>
+                <button
+                  onClick={() => setShowNextNote(false)}
+                  disabled={loading}
+                  className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                    !showNextNote
+                      ? 'bg-orange-500 border-orange-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-700 hover:border-orange-400'
+                  }`}
+                >
+                  <div className="font-semibold">Hide</div>
+                  <div className="text-sm mt-1 opacity-80">More challenging</div>
+                </button>
               </div>
             </div>
 

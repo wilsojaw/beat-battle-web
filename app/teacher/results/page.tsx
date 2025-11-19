@@ -22,19 +22,32 @@ function ResultsContent() {
       return;
     }
 
-    // Connect to Socket.io
-    socket = io();
+    // Reuse existing socket (should already be connected from game page)
+    if (!socket) {
+      socket = io();
+    }
 
-    socket.on('game-ended', (data: { results: GameResult[] }) => {
-      console.log('Game ended results:', data);
+    // Set up listener first before rejoining
+    const handleGameEnded = (data: { results: GameResult[] }) => {
       setResults(data.results);
       setLoading(false);
-    });
+    };
+
+    socket.on('game-ended', handleGameEnded);
+
+    // If socket isn't connected yet, wait for connection
+    if (!socket.connected) {
+      socket.on('connect', () => {
+        socket.emit('teacher-rejoin', { roomCode });
+      });
+    } else {
+      // Rejoin the room to receive events
+      socket.emit('teacher-rejoin', { roomCode });
+    }
 
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
+      socket.off('game-ended', handleGameEnded);
+      // Don't disconnect socket - we might need it
     };
   }, [roomCode, router]);
 
@@ -210,7 +223,7 @@ function ResultsContent() {
                         {result.player.name}
                       </div>
                       <div className="text-sm text-gray-500">
-                        Best: {NOTE_VALUES[result.bestNoteType].displayName}
+                        Best: {NOTE_VALUES[result.bestNoteType].displayName} • {result.player.taps?.length || 0} taps
                       </div>
                     </div>
                   </div>

@@ -24,37 +24,130 @@ function generateRoomCode() {
 
 function generateGameSegments(config) {
   const segments = [];
-  const totalBeats = (config.totalDuration / 60) * config.tempo;
-  const beatsPerSegment = config.segmentDuration * 4;
+  const totalMeasures = config.totalMeasures || 16;
+  const measuresPerSegment = config.measuresPerSegment || config.segmentDuration || 2;
+  const beatsPerMeasure = 4;
+  const beatDuration = 60 / config.tempo; // seconds per beat
 
-  let currentBeat = 0;
-  let segmentIndex = 0;
+  let currentMeasure = 0;
+  let noteValueIndex = 0;
 
-  while (currentBeat < totalBeats) {
-    const noteValue = config.noteValues[segmentIndex % config.noteValues.length];
+  while (currentMeasure < totalMeasures) {
+    const noteValue = config.noteValues[noteValueIndex % config.noteValues.length];
+    const startBeat = currentMeasure * beatsPerMeasure;
+    const endMeasure = Math.min(currentMeasure + measuresPerSegment, totalMeasures);
+    const endBeat = endMeasure * beatsPerMeasure;
+
     segments.push({
       noteValue,
-      startTime: (currentBeat / config.tempo) * 60 * 1000,
-      endTime: ((currentBeat + beatsPerSegment) / config.tempo) * 60 * 1000,
-      durationBars: config.segmentDuration
+      startTime: startBeat * beatDuration * 1000, // ms
+      endTime: endBeat * beatDuration * 1000, // ms
+      durationBars: endMeasure - currentMeasure,
+      startMeasure: currentMeasure + 1, // 1-indexed for display
+      endMeasure: endMeasure
     });
 
-    currentBeat += beatsPerSegment;
-    segmentIndex++;
+    currentMeasure = endMeasure;
+    noteValueIndex++;
   }
 
+  console.log(`Generated ${segments.length} segments from ${totalMeasures} measures (${measuresPerSegment} measures per segment)`);
   return segments;
+}
+
+function logTimingDataForExcel(game) {
+  console.log('\n========== TIMING DATA FOR EXCEL ==========');
+  console.log(`Tempo: ${game.config.tempo} BPM`);
+  console.log(`Game Start Time: ${game.startTime}`);
+  console.log(`Total Players: ${game.players.length}`);
+  console.log('\n--- COPY BELOW THIS LINE ---');
+
+  // Header row (tab-separated)
+  console.log([
+    'Player Name',
+    'Measure',
+    'Segment',
+    'Note Value',
+    'Expected Interval (ms)',
+    'Tap Number',
+    'Tap Timestamp (ms from start)',
+    'Actual Interval (ms)',
+    'Interval Error (ms)',
+    'Accuracy (%)',
+    'Global Time (epoch ms)'
+  ].join('\t'));
+
+  const beatDuration = (60 / game.config.tempo) * 1000; // ms per beat
+  const beatsPerMeasure = 4;
+  const measureDuration = beatDuration * beatsPerMeasure;
+
+  // Loop through all players
+  game.players.forEach(player => {
+    if (!player.taps || player.taps.length === 0) {
+      return;
+    }
+
+    player.taps.forEach((tap, index) => {
+      // Find which segment this tap belongs to
+      const segment = game.segments.find(s =>
+        tap.timestamp >= s.startTime && tap.timestamp < s.endTime
+      ) || game.segments[game.segments.length - 1]; // fallback to last segment
+
+      // Calculate which measure this tap is in
+      const measureNum = Math.floor(tap.timestamp / measureDuration) + 1;
+
+      // Calculate expected interval based on note value
+      const expectedInterval = tap.expectedInterval || 0;
+
+      // Actual interval between taps
+      const actualInterval = tap.interval || 0;
+
+      // Error in interval timing
+      const intervalError = tap.accuracy || 0;
+
+      // Accuracy percentage (100% = perfect)
+      const accuracyPercent = actualInterval > 0 ? Math.max(0, 100 - Math.abs(intervalError) / 2) : 0;
+
+      // Global timestamp
+      const globalTime = game.startTime + tap.timestamp;
+
+      console.log([
+        player.name,
+        measureNum,
+        segment ? `${segment.startMeasure}-${segment.endMeasure}` : 'N/A',
+        tap.noteValue || 'unknown',
+        expectedInterval.toFixed(2),
+        index + 1,
+        tap.timestamp.toFixed(2),
+        actualInterval.toFixed(2),
+        intervalError.toFixed(2),
+        accuracyPercent.toFixed(2),
+        globalTime
+      ].join('\t'));
+    });
+  });
+
+  console.log('--- END OF DATA ---\n');
+  console.log('===========================================\n');
 }
 
 function calculatePlayerAccuracy(taps) {
   if (taps.length === 0) return 0;
 
-  const totalAccuracy = taps.reduce((sum, tap) => {
+  // Filter out first taps in segments (where accuracy is 0 from interval = 0)
+  const validTaps = taps.filter(tap => tap.accuracy !== undefined && tap.accuracy !== null);
+
+  if (validTaps.length === 0) return 0;
+
+  console.log(`Calculating accuracy for ${validTaps.length} taps (filtered from ${taps.length} total)`);
+  console.log(`Sample tap accuracies: ${validTaps.slice(0, 5).map(t => t.accuracy).join(', ')}`);
+
+  const totalAccuracy = validTaps.reduce((sum, tap) => {
     const accuracyPercent = Math.max(0, 100 - Math.abs(tap.accuracy) / 2);
     return sum + accuracyPercent;
   }, 0);
 
-  return Math.round(totalAccuracy / taps.length);
+  return Math.round(totalAccuracy / validTaps.length);
 }
 
 function getBestNoteType(taps) {
@@ -135,12 +228,18 @@ app.prepare().then(() => {
         // Update teacher's socket ID to the new connection
         game.teacher.id = socket.id;
 
-        console.log(`Teacher rejoined room: ${data.roomCode} with new socket ID: ${socket.id}`);
+        console.log(`Teacher rejoined room: ${data.roomCode} with new socket ID: ${socket.id}, game status: ${game.status}`);
 
-        // Send current players to teacher
-        game.players.forEach(player => {
-          socket.emit('player-joined', { player, totalPlayers: game.players.length });
-        });
+        // If game is finished and we have results, send them immediately
+        if (game.status === 'finished' && game.results) {
+          console.log(`Sending cached results to rejoining teacher for room ${data.roomCode}`);
+          socket.emit('game-ended', { results: game.results });
+        } else {
+          // Send current players to teacher
+          game.players.forEach(player => {
+            socket.emit('player-joined', { player, totalPlayers: game.players.length });
+          });
+        }
       }
     });
 
@@ -148,10 +247,16 @@ app.prepare().then(() => {
       const game = games.get(data.roomCode);
       if (game) {
         socket.join(data.roomCode);
-        console.log(`Student rejoined room: ${data.roomCode} with socket ID: ${socket.id}`);
+        console.log(`Student rejoined room: ${data.roomCode} with socket ID: ${socket.id}, game status: ${game.status}`);
 
-        // Send current player count to this student
-        socket.emit('player-count-update', { totalPlayers: game.players.length });
+        // If game is finished and we have results, send them immediately
+        if (game.status === 'finished' && game.results) {
+          console.log(`Sending cached results to rejoining student for room ${data.roomCode}`);
+          socket.emit('game-ended', { results: game.results });
+        } else {
+          // Send current player count to this student
+          socket.emit('player-count-update', { totalPlayers: game.players.length });
+        }
       }
     });
 
@@ -240,35 +345,80 @@ app.prepare().then(() => {
         return;
       }
 
-      game.status = 'playing';
-      game.startTime = Date.now();
-      game.segments = generateGameSegments(game.config);
-      game.currentSegment = game.segments[0];
+      game.status = 'countdown';
 
-      io.to(data.roomCode).emit('game-started', {
-        startTime: game.startTime,
-        segments: game.segments,
-        currentSegment: game.currentSegment
-      });
+      // Send countdown event
+      io.to(data.roomCode).emit('countdown-start', { countdown: 3 });
 
-      console.log(`Game started: ${data.roomCode}`);
+      // Countdown: 3, 2, 1, GO
+      let count = 3;
+      const countdownInterval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          io.to(data.roomCode).emit('countdown-tick', { countdown: count });
+        } else {
+          clearInterval(countdownInterval);
+
+          // Start the actual game
+          game.status = 'playing';
+          game.startTime = Date.now();
+          game.segments = generateGameSegments(game.config);
+          game.currentSegment = game.segments[0];
+
+          io.to(data.roomCode).emit('game-started', {
+            startTime: game.startTime,
+            segments: game.segments,
+            currentSegment: game.currentSegment
+          });
+
+          console.log(`Game started: ${data.roomCode}`);
+        }
+      }, 1000);
+
       callback({ success: true });
     });
 
     socket.on('submit-tap', (data) => {
       const game = games.get(data.roomCode);
-      if (!game) return;
+      if (!game) {
+        console.log(`❌ submit-tap: Game not found for room ${data.roomCode}`);
+        return;
+      }
 
       const player = game.players.find(p => p.id === socket.id);
-      if (player && player.taps) {
-        player.taps.push(data.tap);
-
-        io.to(game.teacher.id).emit('player-tap', {
-          playerId: player.id,
-          playerName: player.name,
-          tap: data.tap
-        });
+      if (!player) {
+        console.log(`❌ submit-tap: Player not found for socket ${socket.id}`);
+        return;
       }
+
+      if (!player.taps) {
+        player.taps = [];
+      }
+
+      player.taps.push(data.tap);
+      console.log(`✅ Tap recorded for ${player.name}: ${player.taps.length} total taps`);
+
+      io.to(game.teacher.id).emit('player-tap', {
+        playerId: player.id,
+        playerName: player.name,
+        tap: data.tap
+      });
+    });
+
+    // Forward student sync logs to teacher
+    socket.on('student-sync-log', (data) => {
+      const game = games.get(data.roomCode);
+      if (!game) return;
+
+      io.to(game.teacher.id).emit('student-sync-log', data);
+    });
+
+    // Forward student tap logs to teacher
+    socket.on('student-tap-log', (data) => {
+      const game = games.get(data.roomCode);
+      if (!game) return;
+
+      io.to(game.teacher.id).emit('student-tap-log', data);
     });
 
     socket.on('change-segment', (data) => {
@@ -279,14 +429,39 @@ app.prepare().then(() => {
       io.to(data.roomCode).emit('segment-changed', { segment: game.currentSegment });
     });
 
-    socket.on('end-game', (data) => {
+    socket.on('end-game', (data, callback) => {
+      console.log(`end-game event received from socket ${socket.id} for room ${data.roomCode}`);
       const game = games.get(data.roomCode);
-      if (!game || game.teacher.id !== socket.id) return;
+
+      if (!game) {
+        console.log(`Game not found for room code: ${data.roomCode}`);
+        if (callback) callback({ success: false, error: 'Game not found' });
+        return;
+      }
+
+      if (game.teacher.id !== socket.id) {
+        console.log(`Unauthorized: socket ${socket.id} is not teacher ${game.teacher.id}`);
+        if (callback) callback({ success: false, error: 'Not authorized' });
+        return;
+      }
+
+      console.log(`Ending game ${data.roomCode}, calculating results for ${game.players.length} players`);
+
+      // Log each player's tap count before calculating
+      game.players.forEach(player => {
+        console.log(`📊 ${player.name}: ${player.taps?.length || 0} taps`);
+      });
+
+      // Generate Excel-friendly timing data for all players
+      console.log('\n\n');
+      logTimingDataForExcel(game);
 
       game.status = 'finished';
 
       const results = game.players.map(player => {
+        const tapCount = player.taps?.length || 0;
         const accuracy = calculatePlayerAccuracy(player.taps || []);
+        console.log(`📊 ${player.name} accuracy: ${accuracy}% (${tapCount} taps)`);
         return {
           player,
           overallAccuracy: accuracy,
@@ -303,8 +478,17 @@ app.prepare().then(() => {
         }
       });
 
+      // Store results in game state for later retrieval
+      game.results = results;
+
+      console.log(`Emitting game-ended to room ${data.roomCode} with ${results.length} results`);
       io.to(data.roomCode).emit('game-ended', { results });
       console.log(`Game ended: ${data.roomCode}`);
+
+      if (callback) {
+        console.log(`Sending success callback to teacher`);
+        callback({ success: true });
+      }
     });
 
     socket.on('disconnect', () => {

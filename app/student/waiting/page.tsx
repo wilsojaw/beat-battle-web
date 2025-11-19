@@ -14,6 +14,7 @@ function WaitingContent() {
 
   const [playerCount, setPlayerCount] = useState(1);
   const [status, setStatus] = useState('Waiting for teacher to start...');
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     // Get values from sessionStorage on client side only
@@ -60,12 +61,42 @@ function WaitingContent() {
       setPlayerCount(data.totalPlayers);
     });
 
+    socket.on('countdown-start', async (data: { countdown: number }) => {
+      console.log('⏱️ Countdown start:', data.countdown);
+      setCountdown(data.countdown);
+
+      // Pre-initialize Tone.js audio context during countdown to reduce lag
+      try {
+        const Tone = await import('tone');
+        await Tone.start();
+        console.log('🔊 Audio context primed during countdown');
+      } catch (e) {
+        console.log('Audio context initialization error:', e);
+      }
+    });
+
+    socket.on('countdown-tick', (data: { countdown: number }) => {
+      console.log('⏱️ Countdown tick:', data.countdown);
+      setCountdown(data.countdown);
+
+      // Navigate to game page when countdown hits 1 (before metronome starts)
+      // This ensures students see the game screen before hearing the metronome
+      if (data.countdown === 1) {
+        setTimeout(() => {
+          router.push(`/student/game?code=${roomCode}`);
+        }, 100);
+      }
+    });
+
     socket.on('game-started', (data: any) => {
       console.log('game-started event received in waiting room!', data);
+      // Students should already be on game page by now
+      // This is just a fallback in case they're still here
+      setCountdown(null);
       setStatus('Game starting!');
       setTimeout(() => {
         router.push(`/student/game?code=${roomCode}`);
-      }, 500);
+      }, 100);
     });
 
     socket.on('teacher-disconnected', () => {
@@ -77,6 +108,18 @@ function WaitingContent() {
       // Don't disconnect socket - we need it for the game page
     };
   }, [roomCode, router]);
+
+  if (countdown !== null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="text-[300px] font-bold leading-none">
+            {countdown === 0 ? 'GO!' : countdown}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center px-4">

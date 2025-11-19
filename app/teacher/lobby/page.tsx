@@ -16,6 +16,7 @@ function LobbyContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [joinUrl, setJoinUrl] = useState('localhost:3000');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!roomCode) {
@@ -83,6 +84,16 @@ function LobbyContent() {
     router.push('/');
   };
 
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(roomCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 py-8 px-4">
       <div className="max-w-5xl mx-auto">
@@ -105,11 +116,31 @@ function LobbyContent() {
               <p className="text-2xl font-bold text-purple-600 mb-3">
                 {joinUrl}/student/join
               </p>
-              <div className="bg-white rounded-lg py-6 px-8 inline-block shadow-lg">
+              <div className="bg-white rounded-lg py-6 px-8 inline-block shadow-lg relative">
                 <p className="text-sm text-gray-600 mb-1">Room Code:</p>
-                <p className="text-6xl font-bold tracking-wider text-purple-600">
-                  {roomCode}
-                </p>
+                <div className="flex items-center gap-4">
+                  <p className="text-6xl font-bold tracking-wider text-purple-600">
+                    {roomCode}
+                  </p>
+                  <button
+                    onClick={copyCode}
+                    className="p-3 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+                    title="Copy code"
+                  >
+                    {copied ? (
+                      <span className="text-2xl">✓</span>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {copied && (
+                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-3 py-1 rounded text-sm">
+                    Copied!
+                  </div>
+                )}
               </div>
             </div>
           </div>

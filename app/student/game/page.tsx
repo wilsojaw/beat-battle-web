@@ -17,14 +17,21 @@ function GameContent() {
   const playerName = sessionStorage.getItem('playerName') || 'Player';
 
   const [currentSegment, setCurrentSegment] = useState<GameSegment | null>(null);
+  const [nextSegment, setNextSegment] = useState<GameSegment | null>(null);
+  const [currentMeasure, setCurrentMeasure] = useState(1);
+  const [totalMeasures, setTotalMeasures] = useState(16);
+  const [showNextNote, setShowNextNote] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<'great' | 'good' | 'miss' | null>(null);
   const [taps, setTaps] = useState<TapEvent[]>([]);
   const [currentAccuracy, setCurrentAccuracy] = useState(100);
 
   const gameStartTimeRef = useRef<number>(0);
-  const expectedTapTimesRef = useRef<number[]>([]);
+  const serverStartTimeRef = useRef<number>(0);
+  const localOffsetRef = useRef<number>(0);
+  const previousTapTimeRef = useRef<number | null>(null);
   const segmentsRef = useRef<GameSegment[]>([]);
   const tapAreaRef = useRef<HTMLDivElement>(null);
 
@@ -33,23 +40,79 @@ function GameContent() {
     segments: GameSegment[];
     currentSegment: GameSegment;
   }) => {
-    console.log('handleGameStart called with:', data);
+    const localReceiveTime = Date.now();
 
-    // Initialize rhythm engine
+    // Initialize rhythm engine (audio context should already be primed)
     rhythmEngine = new RhythmEngine(100);
-    await rhythmEngine.init();
+    // Don't need to init again if already primed, but call it to be safe
+    try {
+      await rhythmEngine.init();
+    } catch (e) {
+      console.log('Audio context already started');
+    }
 
-    gameStartTimeRef.current = Date.now();
+    // Calculate timing sync
+    serverStartTimeRef.current = data.startTime;
+    gameStartTimeRef.current = localReceiveTime;
+    localOffsetRef.current = localReceiveTime - data.startTime;
+
+    const syncInfo = {
+      serverStartTime: data.startTime,
+      localReceiveTime: localReceiveTime,
+      networkLag: localOffsetRef.current,
+      lagMs: `${localOffsetRef.current}ms`
+    };
+
+    console.log('🎮 GAME START SYNC:', syncInfo);
+
+    // Send sync info to teacher
+    socket.emit('student-sync-log', {
+      roomCode,
+      playerName,
+      type: 'game-start',
+      data: syncInfo
+    });
+
     segmentsRef.current = data.segments;
     setCurrentSegment(data.currentSegment);
+    setTotalMeasures(data.segments[data.segments.length - 1]?.endMeasure || 16);
+    setCurrentMeasure(data.currentSegment.startMeasure || 1);
+
+    // Find next segment
+    const currentIndex = data.segments.findIndex(s => s === data.currentSegment);
+    if (currentIndex >= 0 && currentIndex < data.segments.length - 1) {
+      setNextSegment(data.segments[currentIndex + 1]);
+    }
+
     setIsPlaying(true);
 
     // Calculate expected tap times for current segment
     updateExpectedTaps(data.currentSegment);
 
-    // Start metronome
-    rhythmEngine.startMetronome();
+    // NO METRONOME for students - audio comes from headphones
+    // rhythmEngine.startMetronome(); // DISABLED
     rhythmEngine.start();
+
+    // Update current measure in real-time (every beat)
+    const tempo = rhythmEngine.tempo;
+    const beatDuration = (60 / tempo) * 1000; // ms per beat
+    const beatsPerMeasure = 4;
+    const measureDuration = beatDuration * beatsPerMeasure;
+
+    const measureInterval = setInterval(() => {
+      const elapsed = Date.now() - data.startTime;
+      const currentMeasureNum = Math.floor(elapsed / measureDuration) + 1;
+      const totalMeas = data.segments[data.segments.length - 1]?.endMeasure || 16;
+
+      if (currentMeasureNum <= totalMeas) {
+        setCurrentMeasure(currentMeasureNum);
+      } else {
+        clearInterval(measureInterval);
+      }
+    }, 100); // Check every 100ms
+
+    // Store interval ref for cleanup
+    (window as any).measureInterval = measureInterval;
   };
 
   useEffect(() => {
@@ -63,13 +126,13 @@ function GameContent() {
       socket = io();
     }
 
-    console.log('Student game page - socket connected:', socket.connected, 'socket id:', socket.id);
+    // Rejoin room and request game state when socket connects
+    const rejoinAndRequestState = () => {
+      // First rejoin to update socket ID on server
+      socket.emit('student-rejoin', { roomCode });
 
-    // Request game state when socket connects
-    const requestGameState = () => {
-      console.log('Requesting game state for room:', roomCode);
+      // Then request game state
       socket.emit('get-game-state', { roomCode }, (response: any) => {
-        console.log('Got game state response:', response);
         if (response.success && response.game.status === 'playing') {
           handleGameStart({
             startTime: response.game.startTime,
@@ -80,15 +143,24 @@ function GameContent() {
       });
     };
 
-    // If socket is already connected, request immediately
+    // If socket is already connected, rejoin and request immediately
     if (socket.connected) {
-      requestGameState();
+      rejoinAndRequestState();
     }
 
     // Also listen for connect event in case socket isn't connected yet
     socket.on('connect', () => {
-      console.log('Socket connected, requesting game state');
-      requestGameState();
+      rejoinAndRequestState();
+    });
+
+    socket.on('countdown-start', (data: { countdown: number }) => {
+      console.log('⏱️ Countdown start:', data.countdown);
+      setCountdown(data.countdown);
+    });
+
+    socket.on('countdown-tick', (data: { countdown: number }) => {
+      console.log('⏱️ Countdown tick:', data.countdown);
+      setCountdown(data.countdown);
     });
 
     socket.on('game-started', async (data: {
@@ -96,18 +168,27 @@ function GameContent() {
       segments: GameSegment[];
       currentSegment: GameSegment;
     }) => {
-      console.log('game-started event received!', data);
+      setCountdown(null);
       handleGameStart(data);
     });
 
     socket.on('segment-changed', (data: { segment: GameSegment }) => {
-      console.log('Segment changed:', data.segment);
       setCurrentSegment(data.segment);
+      // Don't update current measure here - let the interval handle it
       updateExpectedTaps(data.segment);
+
+      // Find next segment
+      const currentIndex = segmentsRef.current.findIndex(s => s.noteValue === data.segment.noteValue && s.startTime === data.segment.startTime);
+      if (currentIndex >= 0 && currentIndex < segmentsRef.current.length - 1) {
+        setNextSegment(segmentsRef.current[currentIndex + 1]);
+      } else {
+        setNextSegment(null);
+      }
+
+      // DON'T reset previous tap - we want to measure intervals across segments too
     });
 
     socket.on('game-ended', (data: any) => {
-      console.log('Game ended:', data);
       if (rhythmEngine) {
         rhythmEngine.stop();
       }
@@ -123,60 +204,96 @@ function GameContent() {
     });
 
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
-      if (rhythmEngine) {
-        rhythmEngine.dispose();
+      // Remove all event listeners to prevent duplicates
+      socket.off('connect');
+      socket.off('countdown-start');
+      socket.off('countdown-tick');
+      socket.off('game-started');
+      socket.off('segment-changed');
+      socket.off('game-ended');
+      socket.off('teacher-disconnected');
+
+      // Clean up measure interval
+      if ((window as any).measureInterval) {
+        clearInterval((window as any).measureInterval);
       }
     };
   }, [roomCode, router]);
 
   const updateExpectedTaps = (segment: GameSegment) => {
-    if (!rhythmEngine) return;
-
-    const durationMs = segment.endTime - segment.startTime;
-    const durationSeconds = durationMs / 1000;
-
-    expectedTapTimesRef.current = rhythmEngine.getExpectedTapTimes(
-      segment.noteValue,
-      durationSeconds
-    );
+    // No longer needed - we're using interval-based accuracy now
+    // Just here for compatibility with segment-changed event
   };
 
   const handleTap = () => {
     if (!isPlaying || !currentSegment || !rhythmEngine) return;
 
-    const tapTime = Date.now() - gameStartTimeRef.current;
+    const localTapTime = Date.now();
+    const tapTimeSinceLocalStart = localTapTime - gameStartTimeRef.current;
+    const tapTimeSinceServerStart = localTapTime - serverStartTimeRef.current;
 
-    // Calculate accuracy
-    const { accuracy, nearestExpected, isAccurate } = rhythmEngine.calculateTapAccuracy(
-      tapTime,
-      expectedTapTimesRef.current
+    // Calculate expected interval for this note value
+    const noteInfo = NOTE_VALUES[currentSegment.noteValue];
+    const beatDuration = 60 / rhythmEngine.tempo * 1000; // ms per beat
+    const expectedInterval = beatDuration / noteInfo.tapsPerBeat;
+
+    // Calculate accuracy using interval-based method
+    const { accuracy, interval, isAccurate } = rhythmEngine.calculateTapAccuracy(
+      tapTimeSinceServerStart,
+      previousTapTimeRef.current,
+      expectedInterval
     );
+
+    // Update previous tap time for next tap
+    previousTapTimeRef.current = tapTimeSinceServerStart;
 
     // Create tap event
     const tapEvent: TapEvent = {
-      timestamp: tapTime,
+      timestamp: tapTimeSinceServerStart,
       noteValue: currentSegment.noteValue,
-      expectedTime: nearestExpected,
+      expectedTime: expectedInterval,
       accuracy
     };
+
+    // Log detailed timing info
+    const tapLog = {
+      localTapTime: localTapTime,
+      tapTimeSinceLocalStart: tapTimeSinceLocalStart.toFixed(2) + 'ms',
+      tapTimeSinceServerStart: tapTimeSinceServerStart.toFixed(2) + 'ms',
+      interval: interval.toFixed(2) + 'ms',
+      expectedInterval: expectedInterval.toFixed(2) + 'ms',
+      accuracy: accuracy.toFixed(2) + 'ms',
+      noteValue: currentSegment.noteValue,
+      isAccurate: isAccurate,
+      isFirstTap: interval === 0
+    };
+
+    console.log('👆 TAP:', tapLog);
+
+    // Send tap log to teacher
+    socket.emit('student-tap-log', {
+      roomCode,
+      playerName,
+      data: tapLog
+    });
 
     setTaps(prev => [...prev, tapEvent]);
 
     // Submit tap to server
     socket.emit('submit-tap', { roomCode, tap: tapEvent });
 
-    // Show feedback
-    if (Math.abs(accuracy) < 50) {
-      setFeedback('great');
-      rhythmEngine.playClick();
-    } else if (Math.abs(accuracy) < 100) {
-      setFeedback('good');
-      rhythmEngine.playClick();
+    // Show feedback (only for non-first taps)
+    if (interval > 0) {
+      if (Math.abs(accuracy) < 50) {
+        setFeedback('great');
+      } else if (Math.abs(accuracy) < 150) {
+        setFeedback('good');
+      } else {
+        setFeedback('miss');
+      }
     } else {
-      setFeedback('miss');
+      // First tap always gets positive feedback
+      setFeedback('great');
     }
 
     // Calculate current accuracy
@@ -186,17 +303,23 @@ function GameContent() {
     }, 0) / recentTaps.length;
     setCurrentAccuracy(Math.round(avgAccuracy));
 
-    // Clear feedback after animation
-    setTimeout(() => setFeedback(null), 300);
+    // Clear feedback immediately
+    setTimeout(() => setFeedback(null), 100);
 
-    // Add visual feedback
-    if (tapAreaRef.current) {
-      tapAreaRef.current.classList.add('scale-95');
-      setTimeout(() => {
-        tapAreaRef.current?.classList.remove('scale-95');
-      }, 100);
-    }
+    // No visual feedback animation - removed for faster response
   };
+
+  if (countdown !== null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="text-[300px] font-bold leading-none">
+            {countdown === 0 ? 'GO!' : countdown}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isPlaying) {
     return (
@@ -226,12 +349,12 @@ function GameContent() {
     <div
       ref={tapAreaRef}
       onClick={handleTap}
-      className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center justify-center cursor-pointer select-none transition-transform duration-100 relative overflow-hidden"
+      className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center justify-center cursor-pointer select-none relative overflow-hidden"
     >
       {/* Feedback Animation */}
       {feedback && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className={`text-8xl font-bold animate-ping ${
+          <div className={`text-8xl font-bold ${
             feedback === 'great' ? 'text-green-300' :
             feedback === 'good' ? 'text-yellow-300' :
             'text-red-300'
@@ -246,13 +369,17 @@ function GameContent() {
         <div className="flex justify-between items-center text-white">
           <div>
             <span className="font-semibold">{playerName}</span>
+            <div className="text-xs text-white/80">Room: {roomCode}</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold">{Math.round(currentAccuracy)}%</div>
-            <div className="text-xs">Accuracy</div>
+            <div className="text-3xl font-bold">
+              Measure {currentMeasure} / {totalMeasures}
+            </div>
+            <div className="text-xs text-white/80">Current Progress</div>
           </div>
           <div className="text-right">
-            <div className="text-sm">Room: {roomCode}</div>
+            <div className="text-2xl font-bold">{Math.round(currentAccuracy)}%</div>
+            <div className="text-xs">Accuracy</div>
           </div>
         </div>
       </div>
@@ -279,6 +406,17 @@ function GameContent() {
           👆 Tap anywhere to play!
         </p>
       </div>
+
+      {/* Next Note Preview */}
+      {showNextNote && nextSegment && (
+        <div className="absolute bottom-24 left-0 right-0 text-center">
+          <div className="inline-block bg-white/20 backdrop-blur-sm px-8 py-4 rounded-2xl">
+            <div className="text-white/60 text-sm mb-2">Next Up</div>
+            <div className="text-6xl text-white/80">{NOTE_VALUES[nextSegment.noteValue].symbol}</div>
+            <div className="text-white/80 text-lg mt-2">{NOTE_VALUES[nextSegment.noteValue].displayName}</div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Help Text */}
       <div className="absolute bottom-8 left-0 right-0 text-center">

@@ -25,12 +25,12 @@ function ResultsContent() {
       return;
     }
 
-    // Connect to Socket.io
-    socket = io();
+    // Reuse existing socket (should already be connected from game page)
+    if (!socket) {
+      socket = io();
+    }
 
-    socket.on('game-ended', (data: { results: GameResult[] }) => {
-      console.log('Game ended results:', data);
-
+    const handleGameEnded = (data: { results: GameResult[] }) => {
       // Find this player's result
       const myResult = data.results.find(r => r.player.name === playerName);
 
@@ -43,12 +43,23 @@ function ResultsContent() {
       }
 
       setLoading(false);
-    });
+    };
+
+    socket.on('game-ended', handleGameEnded);
+
+    // If socket isn't connected yet, wait for connection
+    if (!socket.connected) {
+      socket.on('connect', () => {
+        socket.emit('student-rejoin', { roomCode });
+      });
+    } else {
+      // Rejoin the room to receive events
+      socket.emit('student-rejoin', { roomCode });
+    }
 
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
+      socket.off('game-ended', handleGameEnded);
+      // Don't disconnect socket
     };
   }, [roomCode, router, playerName]);
 
@@ -124,7 +135,10 @@ function ResultsContent() {
               <div className="text-6xl font-bold text-gray-700 mb-2">
                 {result.overallAccuracy}%
               </div>
-              <div className="text-xl text-gray-600 mb-4">Overall Accuracy</div>
+              <div className="text-xl text-gray-600 mb-2">Overall Accuracy</div>
+              <div className="text-sm text-gray-500 mb-4">
+                {result.player.taps?.length || 0} taps
+              </div>
 
               {/* Stars */}
               <div className="text-5xl">
