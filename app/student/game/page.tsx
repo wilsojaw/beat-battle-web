@@ -32,18 +32,26 @@ function GameContent() {
   const serverStartTimeRef = useRef<number>(0);
   const localOffsetRef = useRef<number>(0);
   const previousTapTimeRef = useRef<number | null>(null);
+  const previousSegmentRef = useRef<GameSegment | null>(null);
+  const currentSegmentRef = useRef<GameSegment | null>(null);
+  const tapsInCurrentSegmentRef = useRef<number>(0);
   const segmentsRef = useRef<GameSegment[]>([]);
   const tapAreaRef = useRef<HTMLDivElement>(null);
+  const configRef = useRef<GameConfig | null>(null);
 
   const handleGameStart = async (data: {
     startTime: number;
     segments: GameSegment[];
     currentSegment: GameSegment;
+    config: GameConfig;
   }) => {
     const localReceiveTime = Date.now();
 
+    // Store config for use in tap handling
+    configRef.current = data.config;
+
     // Initialize rhythm engine (audio context should already be primed)
-    rhythmEngine = new RhythmEngine(100);
+    rhythmEngine = new RhythmEngine(data.config.tempo);
     // Don't need to init again if already primed, but call it to be safe
     try {
       await rhythmEngine.init();
@@ -74,14 +82,21 @@ function GameContent() {
     });
 
     segmentsRef.current = data.segments;
+    currentSegmentRef.current = data.currentSegment;
     setCurrentSegment(data.currentSegment);
+    previousSegmentRef.current = data.currentSegment;
+    tapsInCurrentSegmentRef.current = 0;
     setTotalMeasures(data.segments[data.segments.length - 1]?.endMeasure || 16);
     setCurrentMeasure(data.currentSegment.startMeasure || 1);
 
     // Find next segment
-    const currentIndex = data.segments.findIndex(s => s === data.currentSegment);
+    const currentIndex = data.segments.findIndex(s =>
+      s.noteValue === data.currentSegment.noteValue && s.startTime === data.currentSegment.startTime
+    );
     if (currentIndex >= 0 && currentIndex < data.segments.length - 1) {
       setNextSegment(data.segments[currentIndex + 1]);
+    } else {
+      setNextSegment(null);
     }
 
     setIsPlaying(true);
@@ -94,18 +109,21 @@ function GameContent() {
     rhythmEngine.start();
 
     // Update current measure in real-time (every beat)
-    const tempo = rhythmEngine.tempo;
+    const tempo = data.config.tempo;
     const beatDuration = (60 / tempo) * 1000; // ms per beat
     const beatsPerMeasure = 4;
     const measureDuration = beatDuration * beatsPerMeasure;
+    const countInDuration = measureDuration; // 1 measure count-in
 
     const measureInterval = setInterval(() => {
       const elapsed = Date.now() - data.startTime;
-      const currentMeasureNum = Math.floor(elapsed / measureDuration) + 1;
+
+      // Account for count-in: measure 0 during count-in, then 1-based
+      const currentMeasureNum = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
       const totalMeas = data.segments[data.segments.length - 1]?.endMeasure || 16;
 
       if (currentMeasureNum <= totalMeas) {
-        setCurrentMeasure(currentMeasureNum);
+        setCurrentMeasure(Math.max(0, currentMeasureNum)); // Show 0 during count-in
       } else {
         clearInterval(measureInterval);
       }
@@ -129,7 +147,7 @@ function GameContent() {
     // Rejoin room and request game state when socket connects
     const rejoinAndRequestState = () => {
       // First rejoin to update socket ID on server
-      socket.emit('student-rejoin', { roomCode });
+      socket.emit('student-rejoin', { roomCode, playerName });
 
       // Then request game state
       socket.emit('get-game-state', { roomCode }, (response: any) => {
@@ -137,7 +155,8 @@ function GameContent() {
           handleGameStart({
             startTime: response.game.startTime,
             segments: response.game.segments,
-            currentSegment: response.game.currentSegment
+            currentSegment: response.game.currentSegment,
+            config: response.game.config
           });
         }
       });
@@ -167,12 +186,20 @@ function GameContent() {
       startTime: number;
       segments: GameSegment[];
       currentSegment: GameSegment;
+      config: GameConfig;
     }) => {
       setCountdown(null);
       handleGameStart(data);
     });
 
     socket.on('segment-changed', (data: { segment: GameSegment }) => {
+      // Save previous segment before updating
+      previousSegmentRef.current = currentSegmentRef.current;
+      currentSegmentRef.current = data.segment;
+      tapsInCurrentSegmentRef.current = 0;
+
+      console.log(`🔄 Segment changed: ${previousSegmentRef.current?.noteValue} -> ${data.segment.noteValue}`);
+
       setCurrentSegment(data.segment);
       // Don't update current measure here - let the interval handle it
       updateExpectedTaps(data.segment);
@@ -226,16 +253,29 @@ function GameContent() {
   };
 
   const handleTap = () => {
-    if (!isPlaying || !currentSegment || !rhythmEngine) return;
+    if (!isPlaying || !currentSegmentRef.current || !rhythmEngine) return;
 
     const localTapTime = Date.now();
     const tapTimeSinceLocalStart = localTapTime - gameStartTimeRef.current;
     const tapTimeSinceServerStart = localTapTime - serverStartTimeRef.current;
 
+    // Determine which segment's interval to use for accuracy calculation
+    // For the first tap in a new segment, use the PREVIOUS segment's expected interval
+    const isFirstTapInSegment = tapsInCurrentSegmentRef.current === 0;
+    const segmentForCalculation = (isFirstTapInSegment && previousSegmentRef.current)
+      ? previousSegmentRef.current
+      : currentSegmentRef.current;
+
+    const debugMsg = `Tap #${tapsInCurrentSegmentRef.current + 1} in segment | Using: ${segmentForCalculation.noteValue} | Current: ${currentSegmentRef.current.noteValue} | Prev: ${previousSegmentRef.current?.noteValue || 'none'}`;
+    console.log('👆 ' + debugMsg);
+
     // Calculate expected interval for this note value
-    const noteInfo = NOTE_VALUES[currentSegment.noteValue];
-    const beatDuration = 60 / rhythmEngine.tempo * 1000; // ms per beat
+    const noteInfo = NOTE_VALUES[segmentForCalculation.noteValue];
+    const beatDuration = 60 / (configRef.current?.tempo || 100) * 1000; // ms per beat
     const expectedInterval = beatDuration / noteInfo.tapsPerBeat;
+
+    // Increment tap count for this segment
+    tapsInCurrentSegmentRef.current++;
 
     // Calculate accuracy using interval-based method
     const { accuracy, interval, isAccurate } = rhythmEngine.calculateTapAccuracy(
@@ -248,11 +288,14 @@ function GameContent() {
     previousTapTimeRef.current = tapTimeSinceServerStart;
 
     // Create tap event
+    // Use the segmentForCalculation's note value (which is the previous segment for first tap)
     const tapEvent: TapEvent = {
       timestamp: tapTimeSinceServerStart,
-      noteValue: currentSegment.noteValue,
+      noteValue: segmentForCalculation.noteValue,
       expectedTime: expectedInterval,
-      accuracy
+      accuracy,
+      interval,
+      expectedInterval
     };
 
     // Log detailed timing info
@@ -284,9 +327,9 @@ function GameContent() {
 
     // Show feedback (only for non-first taps)
     if (interval > 0) {
-      if (Math.abs(accuracy) < 50) {
+      if (Math.abs(accuracy) < 30) {
         setFeedback('great');
-      } else if (Math.abs(accuracy) < 150) {
+      } else if (Math.abs(accuracy) < 75) {
         setFeedback('good');
       } else {
         setFeedback('miss');
@@ -343,7 +386,7 @@ function GameContent() {
     );
   }
 
-  const noteInfo = NOTE_VALUES[currentSegment.noteValue];
+  const noteInfo = currentSegment ? NOTE_VALUES[currentSegment.noteValue] : NOTE_VALUES['quarter'];
 
   return (
     <div
@@ -373,7 +416,7 @@ function GameContent() {
           </div>
           <div className="text-center">
             <div className="text-3xl font-bold">
-              Measure {currentMeasure} / {totalMeasures}
+              {currentMeasure === 0 ? 'Count In' : `Measure ${currentMeasure} / ${totalMeasures}`}
             </div>
             <div className="text-xs text-white/80">Current Progress</div>
           </div>

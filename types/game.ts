@@ -98,7 +98,9 @@ export interface TapEvent {
   timestamp: number;
   noteValue: NoteValue;
   expectedTime: number;
-  accuracy: number; // ms difference from expected
+  accuracy: number; // ms difference from expected (interval error)
+  interval?: number; // actual interval between this tap and previous tap (ms)
+  expectedInterval?: number; // expected interval for this note value (ms)
 }
 
 export interface GameSegment {

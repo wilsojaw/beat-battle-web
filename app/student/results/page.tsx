@@ -50,11 +50,11 @@ function ResultsContent() {
     // If socket isn't connected yet, wait for connection
     if (!socket.connected) {
       socket.on('connect', () => {
-        socket.emit('student-rejoin', { roomCode });
+        socket.emit('student-rejoin', { roomCode, playerName });
       });
     } else {
       // Rejoin the room to receive events
-      socket.emit('student-rejoin', { roomCode });
+      socket.emit('student-rejoin', { roomCode, playerName });
     }
 
     return () => {

@@ -28,11 +28,13 @@ function GameContent() {
   const gameStartTimeRef = useRef<number>(0);
   const configRef = useRef<GameConfig | null>(null);
   const beatLogIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentSegmentIndexRef = useRef<number>(0);
 
   const handleGameStart = async (data: {
     startTime: number;
     segments: GameSegment[];
     currentSegment: GameSegment;
+    config: GameConfig;
   }) => {
     // Dispose any existing rhythm engine first
     if (rhythmEngine) {
@@ -40,8 +42,11 @@ function GameContent() {
       rhythmEngine = null;
     }
 
-    // Initialize rhythm engine
-    rhythmEngine = new RhythmEngine(100);
+    // Store config
+    configRef.current = data.config;
+
+    // Initialize rhythm engine with actual tempo from config
+    rhythmEngine = new RhythmEngine(data.config.tempo);
     await rhythmEngine.init();
 
     // Teacher is the source of truth for time
@@ -64,7 +69,7 @@ function GameContent() {
 
     // Log metronome beats
     let beatCount = 0;
-    const beatInterval = (60 / 100) * 1000; // 100 BPM = 600ms per beat
+    const beatInterval = (60 / data.config.tempo) * 1000; // ms per beat
     const logBeats = setInterval(() => {
       if (!isPlaying) {
         clearInterval(logBeats);
@@ -108,7 +113,8 @@ function GameContent() {
           handleGameStart({
             startTime: response.game.startTime,
             segments: response.game.segments,
-            currentSegment: response.game.currentSegment
+            currentSegment: response.game.currentSegment,
+            config: response.game.config
           });
         }
       });
@@ -136,6 +142,7 @@ function GameContent() {
       startTime: number;
       segments: GameSegment[];
       currentSegment: GameSegment;
+      config: GameConfig;
     }) => {
       setCountdown(null);
       handleGameStart(data);
@@ -197,12 +204,13 @@ function GameContent() {
 
       // Check if we should move to next segment
       const currentSegment = gameSegments.find(
-        (seg, idx) => elapsed >= seg.startTime && elapsed < seg.endTime && idx !== currentSegmentIndex
+        (seg, idx) => elapsed >= seg.startTime && elapsed < seg.endTime && idx !== currentSegmentIndexRef.current
       );
 
       if (currentSegment) {
         const newIndex = gameSegments.indexOf(currentSegment);
-        if (newIndex !== currentSegmentIndex) {
+        if (newIndex !== currentSegmentIndexRef.current) {
+          currentSegmentIndexRef.current = newIndex;
           setCurrentSegmentIndex(newIndex);
           socket.emit('change-segment', { roomCode, segmentIndex: newIndex });
         }

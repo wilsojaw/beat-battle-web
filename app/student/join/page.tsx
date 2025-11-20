@@ -8,7 +8,7 @@ let socket: Socket;
 
 export default function StudentJoin() {
   const router = useRouter();
-  const [playerName, setPlayerName] = useState('');
+  const [playerName, setPlayerName] = useState('Student');
   const [roomCode, setRoomCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

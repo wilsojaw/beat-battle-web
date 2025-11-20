@@ -29,6 +29,10 @@ function generateGameSegments(config) {
   const beatsPerMeasure = 4;
   const beatDuration = 60 / config.tempo; // seconds per beat
 
+  // Add 1 measure (4 beats) count-in offset
+  const countInBeats = beatsPerMeasure;
+  const countInOffset = countInBeats * beatDuration * 1000; // ms
+
   let currentMeasure = 0;
   let noteValueIndex = 0;
 
@@ -40,8 +44,8 @@ function generateGameSegments(config) {
 
     segments.push({
       noteValue,
-      startTime: startBeat * beatDuration * 1000, // ms
-      endTime: endBeat * beatDuration * 1000, // ms
+      startTime: (startBeat * beatDuration * 1000) + countInOffset, // ms (offset by count-in)
+      endTime: (endBeat * beatDuration * 1000) + countInOffset, // ms (offset by count-in)
       durationBars: endMeasure - currentMeasure,
       startMeasure: currentMeasure + 1, // 1-indexed for display
       endMeasure: endMeasure
@@ -247,7 +251,18 @@ app.prepare().then(() => {
       const game = games.get(data.roomCode);
       if (game) {
         socket.join(data.roomCode);
-        console.log(`Student rejoined room: ${data.roomCode} with socket ID: ${socket.id}, game status: ${game.status}`);
+
+        // Find player by name and update their socket ID
+        const playerName = data.playerName;
+        const player = game.players.find(p => p.name === playerName);
+
+        if (player) {
+          const oldSocketId = player.id;
+          player.id = socket.id;
+          console.log(`✅ Student ${playerName} rejoined room: ${data.roomCode}, updated socket ID from ${oldSocketId} to ${socket.id}, game status: ${game.status}`);
+        } else {
+          console.log(`⚠️ Student rejoined room: ${data.roomCode} with socket ID: ${socket.id}, but player not found in game, game status: ${game.status}`);
+        }
 
         // If game is finished and we have results, send them immediately
         if (game.status === 'finished' && game.results) {
@@ -368,7 +383,8 @@ app.prepare().then(() => {
           io.to(data.roomCode).emit('game-started', {
             startTime: game.startTime,
             segments: game.segments,
-            currentSegment: game.currentSegment
+            currentSegment: game.currentSegment,
+            config: game.config
           });
 
           console.log(`Game started: ${data.roomCode}`);

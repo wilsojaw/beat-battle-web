@@ -10,7 +10,7 @@ let socket: Socket;
 
 export default function TeacherSetup() {
   const router = useRouter();
-  const [teacherName, setTeacherName] = useState('');
+  const [teacherName, setTeacherName] = useState('Teacher');
   const [tempo, setTempo] = useState(100);
   const [selectedNotes, setSelectedNotes] = useState<NoteValue[]>(['quarter', 'eighth', 'half']);
   const [totalMeasures, setTotalMeasures] = useState(16);
