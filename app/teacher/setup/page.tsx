@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import type { GameConfig, NoteValue } from '@/types/game';
 import { NOTE_VALUES } from '@/types/game';
+import { TemplatePickerModal } from '@/components/TemplatePickerModal';
+import type { GameTemplate } from '@/lib/game-templates';
 
 let socket: Socket;
 
@@ -19,8 +21,18 @@ export default function TeacherSetup() {
   const [leaderboardStyle, setLeaderboardStyle] = useState<'full' | 'top3' | 'stars-only'>('full');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   const noteOptions: NoteValue[] = ['quarter', 'half', 'whole', 'eighth', 'dotted-quarter', 'dotted-eighth', 'sixteenth'];
+
+  const applyTemplate = (template: GameTemplate) => {
+    setTempo(template.settings.tempo);
+    setSelectedNotes(template.settings.noteValues);
+    setTotalMeasures(template.settings.totalMeasures);
+    setMeasuresPerSegment(template.settings.measuresPerSegment);
+    setShowNextNote(template.settings.showNextNote);
+    setLeaderboardStyle(template.settings.leaderboardStyle);
+  };
 
   const toggleNote = (note: NoteValue) => {
     if (selectedNotes.includes(note)) {
@@ -87,8 +99,20 @@ export default function TeacherSetup() {
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <h1 className="text-4xl font-bold text-purple-600 mb-2">🎓 Teacher Setup</h1>
-          <p className="text-gray-600 mb-8">Configure your Beat Battle game</p>
+          <div className="flex justify-between items-start mb-8">
+            <div>
+              <h1 className="text-4xl font-bold text-purple-600 mb-2">🎓 Teacher Setup</h1>
+              <p className="text-gray-600">Configure your Beat Battle game</p>
+            </div>
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              disabled={loading}
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-cyan-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2"
+            >
+              <span className="text-xl">📚</span>
+              <span>Use Template</span>
+            </button>
+          </div>
 
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
@@ -299,6 +323,13 @@ export default function TeacherSetup() {
             </button>
           </div>
         </div>
+
+        {/* Template Picker Modal */}
+        <TemplatePickerModal
+          isOpen={showTemplateModal}
+          onClose={() => setShowTemplateModal(false)}
+          onSelectTemplate={applyTemplate}
+        />
       </div>
     </div>
   );
