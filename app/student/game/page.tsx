@@ -382,9 +382,9 @@ function GameContent() {
 
   if (countdown !== null) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center p-4">
         <div className="text-center text-white">
-          <div className="text-[300px] font-bold leading-none">
+          <div className="text-[120px] sm:text-[200px] md:text-[300px] font-bold leading-none">
             {countdown === 0 ? 'GO!' : countdown}
           </div>
         </div>
@@ -394,11 +394,11 @@ function GameContent() {
 
   if (!isPlaying) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center p-4">
         <div className="text-center text-white">
-          <div className="text-6xl mb-4 animate-bounce">🎵</div>
-          <h1 className="text-4xl font-bold mb-2">Get Ready!</h1>
-          <p className="text-xl">The game is about to start...</p>
+          <div className="text-4xl sm:text-6xl mb-4 animate-bounce">🎵</div>
+          <h1 className="text-2xl sm:text-4xl font-bold mb-2">Get Ready!</h1>
+          <p className="text-base sm:text-xl">The game is about to start...</p>
         </div>
       </div>
     );
@@ -442,25 +442,25 @@ function GameContent() {
       <LeaderboardPanel leaderboard={leaderboard} />
 
       {/* Top Bar */}
-      <div className="absolute top-0 left-0 right-0 bg-black/20 backdrop-blur-sm p-4">
-        <div className="flex justify-between items-center text-white">
-          <div>
-            <span className="font-semibold">{playerName}</span>
-            <div className="text-xs text-white/80">Room: {roomCode}</div>
+      <div className="absolute top-0 left-0 right-0 bg-black/20 backdrop-blur-sm p-2 sm:p-4">
+        <div className="flex justify-between items-start sm:items-center text-white gap-1 sm:gap-4">
+          <div className="flex-shrink-0 min-w-0">
+            <span className="font-semibold text-xs sm:text-base truncate block">{playerName}</span>
+            <div className="text-[10px] sm:text-xs text-white/80 hidden sm:block">Room: {roomCode}</div>
           </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold">
-              {currentMeasure === 0 ? 'Count In' : `Measure ${currentMeasure} / ${totalMeasures}`}
+          <div className="text-center flex-1 min-w-0">
+            <div className="text-lg sm:text-2xl md:text-3xl font-bold leading-tight">
+              {currentMeasure === 0 ? 'Count In' : `${currentMeasure}/${totalMeasures}`}
             </div>
-            <div className="text-xs text-white/80">Current Progress</div>
+            <div className="text-[10px] sm:text-xs text-white/80 hidden sm:block">Progress</div>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold">{Math.round(currentAccuracy)}%</div>
-            <div className="text-xs">Accuracy</div>
+          <div className="text-right flex-shrink-0">
+            <div className="text-lg sm:text-xl md:text-2xl font-bold">{Math.round(currentAccuracy)}%</div>
+            <div className="text-[10px] sm:text-xs text-white/80">Accuracy</div>
             {personalStats && (
-              <div className="text-xs text-white/80 mt-1">
+              <div className="text-[10px] sm:text-xs text-white/80 mt-0.5 sm:mt-1">
                 {personalStats.currentStreak >= 3 && (
-                  <span className="mr-2">🔥 {personalStats.currentStreak}</span>
+                  <span className="mr-1 sm:mr-2">🔥{personalStats.currentStreak}</span>
                 )}
                 {personalStats.currentRank > 0 && (
                   <span>#{personalStats.currentRank}</span>
@@ -472,42 +472,42 @@ function GameContent() {
       </div>
 
       {/* Main Content */}
-      <div className="text-center text-white px-4">
+      <div className="text-center text-white px-2 sm:px-4">
         {/* Note Symbol */}
-        <div className="text-[200px] leading-none mb-8 animate-pulse">
+        <div className="text-[120px] sm:text-[160px] md:text-[200px] leading-none mb-4 sm:mb-8 animate-pulse">
           {noteInfo.symbol}
         </div>
 
         {/* Note Name */}
-        <h2 className="text-5xl font-bold mb-4">
+        <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-2 sm:mb-4">
           {noteInfo.displayName}
         </h2>
 
         {/* Instructions */}
-        <p className="text-2xl mb-8 bg-white/20 backdrop-blur-sm px-8 py-4 rounded-full">
+        <p className="text-sm sm:text-xl md:text-2xl mb-4 sm:mb-8 bg-white/20 backdrop-blur-sm px-4 sm:px-8 py-2 sm:py-4 rounded-full max-w-md mx-auto">
           {noteInfo.description}
         </p>
 
         {/* Tap Instruction */}
-        <p className="text-xl text-white/80 animate-bounce">
+        <p className="text-base sm:text-xl text-white/80 animate-bounce">
           👆 Tap anywhere to play!
         </p>
       </div>
 
       {/* Next Note Preview */}
       {showNextNote && nextSegment && (
-        <div className="absolute bottom-24 left-0 right-0 text-center">
-          <div className="inline-block bg-white/20 backdrop-blur-sm px-8 py-4 rounded-2xl">
-            <div className="text-white/60 text-sm mb-2">Next Up</div>
-            <div className="text-6xl text-white/80">{NOTE_VALUES[nextSegment.noteValue].symbol}</div>
-            <div className="text-white/80 text-lg mt-2">{NOTE_VALUES[nextSegment.noteValue].displayName}</div>
+        <div className="absolute bottom-16 sm:bottom-24 left-0 right-0 text-center px-2">
+          <div className="inline-block bg-white/20 backdrop-blur-sm px-4 sm:px-8 py-2 sm:py-4 rounded-2xl">
+            <div className="text-white/60 text-xs sm:text-sm mb-1 sm:mb-2">Next Up</div>
+            <div className="text-4xl sm:text-6xl text-white/80">{NOTE_VALUES[nextSegment.noteValue].symbol}</div>
+            <div className="text-white/80 text-sm sm:text-lg mt-1 sm:mt-2">{NOTE_VALUES[nextSegment.noteValue].displayName}</div>
           </div>
         </div>
       )}
 
       {/* Bottom Help Text */}
-      <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-white/60 text-sm">
+      <div className="absolute bottom-4 sm:bottom-8 left-0 right-0 text-center px-2">
+        <p className="text-white/60 text-xs sm:text-sm">
           Listen to the metronome and tap in rhythm
         </p>
       </div>

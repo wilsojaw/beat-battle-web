@@ -34,16 +34,31 @@ export function MilestoneToast({ milestones }: MilestoneToastProps) {
   }
 
   return (
-    <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none">
+    <div className="
+      absolute
+      top-16 left-1/2 -translate-x-1/2
+      sm:top-24
+      z-50 flex flex-col gap-2
+      pointer-events-none
+      w-[90%] sm:w-auto
+      max-w-md sm:max-w-xl
+    ">
       {visibleMilestones.map((milestone) => (
         <div
           key={milestone.id}
           className="animate-in slide-in-from-top-5 fade-in duration-300 animate-out slide-out-to-top-5 fade-out delay-2700"
         >
-          <div className="bg-gradient-to-r from-purple-600/90 to-pink-600/90 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl border border-white/30">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{milestone.icon}</span>
-              <span className="text-lg font-bold">{milestone.message}</span>
+          <div className="
+            bg-gradient-to-r from-purple-600/90 to-pink-600/90
+            backdrop-blur-md text-white
+            px-3 py-2 sm:px-6 sm:py-3
+            rounded-full shadow-2xl border border-white/30
+          ">
+            <div className="flex items-center gap-2 sm:gap-3 justify-center">
+              <span className="text-xl sm:text-3xl flex-shrink-0">{milestone.icon}</span>
+              <span className="text-sm sm:text-lg font-bold text-center leading-tight">
+                {milestone.message}
+              </span>
             </div>
           </div>
         </div>
