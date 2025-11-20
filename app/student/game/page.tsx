@@ -4,8 +4,10 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { RhythmEngine } from '@/lib/rhythm-engine';
-import type { NoteValue, GameSegment, TapEvent } from '@/types/game';
+import type { NoteValue, GameSegment, TapEvent, LeaderboardUpdate, MilestoneEvent, PersonalStats } from '@/types/game';
 import { NOTE_VALUES } from '@/types/game';
+import { LeaderboardPanel } from '@/components/LeaderboardPanel';
+import { MilestoneToast } from '@/components/MilestoneToast';
 
 let socket: Socket;
 let rhythmEngine: RhythmEngine | null = null;
@@ -27,6 +29,11 @@ function GameContent() {
   const [feedback, setFeedback] = useState<'great' | 'good' | 'miss' | null>(null);
   const [taps, setTaps] = useState<TapEvent[]>([]);
   const [currentAccuracy, setCurrentAccuracy] = useState(100);
+
+  // Stats and milestones state
+  const [leaderboard, setLeaderboard] = useState<LeaderboardUpdate | null>(null);
+  const [milestones, setMilestones] = useState<MilestoneEvent[]>([]);
+  const [personalStats, setPersonalStats] = useState<PersonalStats | null>(null);
 
   const gameStartTimeRef = useRef<number>(0);
   const serverStartTimeRef = useRef<number>(0);
@@ -230,6 +237,24 @@ function GameContent() {
       router.push('/student/join');
     });
 
+    // Milestone and stats listeners
+    socket.on('milestone-achieved', (milestone: MilestoneEvent) => {
+      console.log('🎉 Milestone achieved:', milestone.message);
+      setMilestones((prev) => [...prev, milestone]);
+    });
+
+    socket.on('leaderboard-update', (update: LeaderboardUpdate) => {
+      setLeaderboard(update);
+    });
+
+    socket.on('personal-stats-update', (stats: PersonalStats) => {
+      setPersonalStats(stats);
+      // Also update current accuracy display
+      if (stats.accuracy !== undefined) {
+        setCurrentAccuracy(stats.accuracy);
+      }
+    });
+
     return () => {
       // Remove all event listeners to prevent duplicates
       socket.off('connect');
@@ -239,6 +264,9 @@ function GameContent() {
       socket.off('segment-changed');
       socket.off('game-ended');
       socket.off('teacher-disconnected');
+      socket.off('milestone-achieved');
+      socket.off('leaderboard-update');
+      socket.off('personal-stats-update');
 
       // Clean up measure interval
       if ((window as any).measureInterval) {
@@ -407,6 +435,12 @@ function GameContent() {
         </div>
       )}
 
+      {/* Milestone Toast Notifications */}
+      <MilestoneToast milestones={milestones} />
+
+      {/* Leaderboard Panel */}
+      <LeaderboardPanel leaderboard={leaderboard} />
+
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 bg-black/20 backdrop-blur-sm p-4">
         <div className="flex justify-between items-center text-white">
@@ -423,6 +457,16 @@ function GameContent() {
           <div className="text-right">
             <div className="text-2xl font-bold">{Math.round(currentAccuracy)}%</div>
             <div className="text-xs">Accuracy</div>
+            {personalStats && (
+              <div className="text-xs text-white/80 mt-1">
+                {personalStats.currentStreak >= 3 && (
+                  <span className="mr-2">🔥 {personalStats.currentStreak}</span>
+                )}
+                {personalStats.currentRank > 0 && (
+                  <span>#{personalStats.currentRank}</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

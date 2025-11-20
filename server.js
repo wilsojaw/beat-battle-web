@@ -13,6 +13,291 @@ const handle = app.getRequestHandler();
 // Import socket server logic
 const games = new Map();
 
+// Milestone and stats tracking configuration
+const GREAT_TAP_THRESHOLD = 50; // ms
+const COOLDOWN_SAME_TYPE = 10000; // 10 seconds
+const COOLDOWN_GLOBAL_BROADCAST = 3000; // 3 seconds
+
+const MILESTONE_CONFIG = {
+  streak: {
+    3: { icon: '🔥', messages: ['{name} is warming up!', '{name} found the groove!'] },
+    5: { icon: '🔥🔥', messages: ['{name} is on fire!', '{name} can\'t miss!'] },
+    10: { icon: '🔥🔥🔥', messages: ['{name} is UNSTOPPABLE!', '{name} is IN THE ZONE!'] },
+    15: { icon: '⭐', messages: ['{name} has a PERFECT STREAK!', '{name} is a RHYTHM GOD!'] }
+  },
+  accuracy: {
+    80: { icon: '🎵', message: 'You\'re finding the rhythm!' },
+    90: { icon: '🎯', message: 'You\'re a Rhythm Master!' },
+    95: { icon: '✨', message: 'You\'re nearly perfect!' }
+  },
+  competitive: {
+    enteredTop3: { icon: '🌟', messages: ['{name} just hit top 3!', '{name} is climbing!'] },
+    becameLeader: { icon: '👑', messages: ['{name} is now in the LEAD!', '{name} took over!'] },
+    climbingUp: { icon: '📈', messages: ['{name} is climbing the leaderboard!', '{name} is on the rise!'] }
+  }
+};
+
+// Stats tracking helper functions
+function isGreatTap(accuracy) {
+  return Math.abs(accuracy) <= GREAT_TAP_THRESHOLD;
+}
+
+function calculateCurrentStreak(taps) {
+  if (!taps || taps.length === 0) return 0;
+
+  let streak = 0;
+  for (let i = taps.length - 1; i >= 0; i--) {
+    const tap = taps[i];
+    // Skip first taps in segments
+    if (tap.interval === 0 || tap.interval === undefined) {
+      continue;
+    }
+    if (isGreatTap(tap.accuracy)) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function calculateRollingAccuracy(taps, count = 10) {
+  if (!taps || taps.length === 0) return 0;
+
+  const recentTaps = taps.slice(-count);
+  const validTaps = recentTaps.filter(tap =>
+    tap.accuracy !== undefined &&
+    tap.accuracy !== null &&
+    tap.interval !== 0
+  );
+
+  if (validTaps.length === 0) return 0;
+
+  const totalAccuracy = validTaps.reduce((sum, tap) => {
+    const accuracyPercent = Math.max(0, 100 - Math.abs(tap.accuracy) / 2);
+    return sum + accuracyPercent;
+  }, 0);
+
+  return Math.round(totalAccuracy / validTaps.length);
+}
+
+function getRandomMessage(messages) {
+  return messages[Math.floor(Math.random() * messages.length)];
+}
+
+function formatMessage(template, playerName) {
+  return template.replace('{name}', playerName);
+}
+
+function canTriggerMilestone(player, milestoneType, cooldownMs = COOLDOWN_SAME_TYPE) {
+  if (!player.lastMilestoneTimestamps) {
+    player.lastMilestoneTimestamps = new Map();
+  }
+
+  const lastTime = player.lastMilestoneTimestamps.get(milestoneType);
+  if (!lastTime) {
+    return true;
+  }
+
+  return Date.now() - lastTime >= cooldownMs;
+}
+
+function recordMilestoneTrigger(player, milestoneType) {
+  if (!player.lastMilestoneTimestamps) {
+    player.lastMilestoneTimestamps = new Map();
+  }
+  player.lastMilestoneTimestamps.set(milestoneType, Date.now());
+}
+
+function checkStreakMilestones(player, currentStreak) {
+  const thresholds = [15, 10, 5, 3];
+
+  for (const threshold of thresholds) {
+    if (currentStreak === threshold) {
+      const config = MILESTONE_CONFIG.streak[threshold];
+      if (!config) continue;
+
+      const milestoneKey = `streak-${threshold}`;
+      if (!canTriggerMilestone(player, milestoneKey)) {
+        return null;
+      }
+
+      const message = formatMessage(getRandomMessage(config.messages), player.name);
+      recordMilestoneTrigger(player, milestoneKey);
+
+      return {
+        id: `${player.id}-${milestoneKey}-${Date.now()}`,
+        type: 'streak',
+        playerId: player.id,
+        playerName: player.name,
+        message: `${message} ${config.icon}`,
+        icon: config.icon,
+        broadcast: true,
+        timestamp: Date.now(),
+        data: { streakCount: threshold }
+      };
+    }
+  }
+
+  return null;
+}
+
+function checkAccuracyMilestones(player, accuracy) {
+  const thresholds = [95, 90, 80];
+
+  for (const threshold of thresholds) {
+    if (accuracy >= threshold) {
+      const config = MILESTONE_CONFIG.accuracy[threshold];
+      if (!config) continue;
+
+      const milestoneKey = `accuracy-${threshold}`;
+      if (!canTriggerMilestone(player, milestoneKey)) {
+        return null;
+      }
+
+      recordMilestoneTrigger(player, milestoneKey);
+
+      return {
+        id: `${player.id}-${milestoneKey}-${Date.now()}`,
+        type: 'accuracy',
+        playerId: player.id,
+        playerName: player.name,
+        message: `${config.message} ${config.icon}`,
+        icon: config.icon,
+        broadcast: false,
+        timestamp: Date.now(),
+        data: { accuracyPercent: accuracy }
+      };
+    }
+  }
+
+  return null;
+}
+
+function checkCompetitiveMilestones(player) {
+  const currentRank = player.currentRank || 0;
+  const previousRank = player.previousRank || 0;
+
+  if (currentRank === 0 || previousRank === 0 || currentRank === previousRank) {
+    return null;
+  }
+
+  // Became leader
+  if (currentRank === 1 && previousRank > 1) {
+    const config = MILESTONE_CONFIG.competitive.becameLeader;
+    const milestoneKey = 'became-leader';
+
+    if (!canTriggerMilestone(player, milestoneKey)) {
+      return null;
+    }
+
+    const message = formatMessage(getRandomMessage(config.messages), player.name);
+    recordMilestoneTrigger(player, milestoneKey);
+
+    return {
+      id: `${player.id}-${milestoneKey}-${Date.now()}`,
+      type: 'competitive',
+      playerId: player.id,
+      playerName: player.name,
+      message: `${message} ${config.icon}`,
+      icon: config.icon,
+      broadcast: true,
+      timestamp: Date.now(),
+      data: { currentRank, previousRank }
+    };
+  }
+
+  // Entered top 3
+  if (currentRank <= 3 && previousRank > 3) {
+    const config = MILESTONE_CONFIG.competitive.enteredTop3;
+    const milestoneKey = 'entered-top3';
+
+    if (!canTriggerMilestone(player, milestoneKey)) {
+      return null;
+    }
+
+    const message = formatMessage(getRandomMessage(config.messages), player.name);
+    recordMilestoneTrigger(player, milestoneKey);
+
+    return {
+      id: `${player.id}-${milestoneKey}-${Date.now()}`,
+      type: 'competitive',
+      playerId: player.id,
+      playerName: player.name,
+      message: `${message} ${config.icon}`,
+      icon: config.icon,
+      broadcast: true,
+      timestamp: Date.now(),
+      data: { currentRank, previousRank }
+    };
+  }
+
+  // Climbing up (2+ ranks)
+  if (previousRank - currentRank >= 2) {
+    const config = MILESTONE_CONFIG.competitive.climbingUp;
+    const milestoneKey = 'climbing-up';
+
+    if (!canTriggerMilestone(player, milestoneKey)) {
+      return null;
+    }
+
+    const message = formatMessage(getRandomMessage(config.messages), player.name);
+    recordMilestoneTrigger(player, milestoneKey);
+
+    return {
+      id: `${player.id}-${milestoneKey}-${Date.now()}`,
+      type: 'competitive',
+      playerId: player.id,
+      playerName: player.name,
+      message: `${message} ${config.icon}`,
+      icon: config.icon,
+      broadcast: true,
+      timestamp: Date.now(),
+      data: { currentRank, previousRank, ranksClimbed: previousRank - currentRank }
+    };
+  }
+
+  return null;
+}
+
+function updatePlayerRankings(game) {
+  // Calculate current accuracy for all players
+  const playersWithAccuracy = game.players.map(player => ({
+    player,
+    accuracy: calculateRollingAccuracy(player.taps || [])
+  }));
+
+  // Sort by accuracy descending
+  playersWithAccuracy.sort((a, b) => b.accuracy - a.accuracy);
+
+  // Update ranks
+  playersWithAccuracy.forEach((item, index) => {
+    const player = item.player;
+    player.previousRank = player.currentRank || 0;
+    player.currentRank = index + 1;
+  });
+
+  return playersWithAccuracy;
+}
+
+function generateLeaderboardUpdate(game) {
+  const playersWithAccuracy = updatePlayerRankings(game);
+
+  // Get top 3 players
+  const topPlayers = playersWithAccuracy.slice(0, 3).map((item, index) => ({
+    rank: index + 1,
+    name: item.player.name,
+    accuracy: item.accuracy,
+    hasStreak: (item.player.currentStreak || 0) >= 3
+  }));
+
+  return {
+    topPlayers,
+    totalPlayers: game.players.length,
+    timestamp: Date.now()
+  };
+}
+
 function generateRoomCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
@@ -388,6 +673,31 @@ app.prepare().then(() => {
           });
 
           console.log(`Game started: ${data.roomCode}`);
+
+          // Start leaderboard update interval (every 3 seconds)
+          const leaderboardInterval = setInterval(() => {
+            if (game.status !== 'playing') {
+              clearInterval(leaderboardInterval);
+              return;
+            }
+
+            const leaderboardUpdate = generateLeaderboardUpdate(game);
+
+            // Check for competitive milestones after rank updates
+            game.players.forEach(player => {
+              const competitiveMilestone = checkCompetitiveMilestones(player);
+              if (competitiveMilestone) {
+                io.to(data.roomCode).emit('milestone-achieved', competitiveMilestone);
+                console.log(`🎉 Competitive milestone: ${competitiveMilestone.message}`);
+              }
+            });
+
+            // Emit leaderboard update to all players
+            io.to(data.roomCode).emit('leaderboard-update', leaderboardUpdate);
+          }, 3000); // Update every 3 seconds
+
+          // Store interval ref for cleanup
+          game.leaderboardInterval = leaderboardInterval;
         }
       }, 1000);
 
@@ -413,6 +723,56 @@ app.prepare().then(() => {
 
       player.taps.push(data.tap);
       console.log(`✅ Tap recorded for ${player.name}: ${player.taps.length} total taps`);
+
+      // Calculate current stats
+      const currentStreak = calculateCurrentStreak(player.taps);
+      const currentAccuracy = calculateRollingAccuracy(player.taps);
+
+      // Update player stats
+      if (!player.currentStreak) player.currentStreak = 0;
+      if (!player.bestStreak) player.bestStreak = 0;
+
+      player.currentStreak = currentStreak;
+      if (currentStreak > player.bestStreak) {
+        player.bestStreak = currentStreak;
+      }
+
+      // Check for milestones
+      const milestones = [];
+
+      // Check streak milestones
+      const streakMilestone = checkStreakMilestones(player, currentStreak);
+      if (streakMilestone) {
+        milestones.push(streakMilestone);
+      }
+
+      // Check accuracy milestones
+      const accuracyMilestone = checkAccuracyMilestones(player, currentAccuracy);
+      if (accuracyMilestone) {
+        milestones.push(accuracyMilestone);
+      }
+
+      // Emit milestones
+      milestones.forEach(milestone => {
+        if (milestone.broadcast) {
+          // Broadcast to all players in the room
+          io.to(data.roomCode).emit('milestone-achieved', milestone);
+          console.log(`🎉 Milestone broadcast: ${milestone.message}`);
+        } else {
+          // Send only to this player
+          socket.emit('milestone-achieved', milestone);
+          console.log(`🎉 Personal milestone for ${player.name}: ${milestone.message}`);
+        }
+      });
+
+      // Send personal stats update to this player
+      socket.emit('personal-stats-update', {
+        currentStreak,
+        bestStreak: player.bestStreak,
+        currentRank: player.currentRank || 0,
+        previousRank: player.previousRank || 0,
+        accuracy: currentAccuracy
+      });
 
       io.to(game.teacher.id).emit('player-tap', {
         playerId: player.id,
@@ -473,6 +833,12 @@ app.prepare().then(() => {
       logTimingDataForExcel(game);
 
       game.status = 'finished';
+
+      // Clear leaderboard interval
+      if (game.leaderboardInterval) {
+        clearInterval(game.leaderboardInterval);
+        console.log('Leaderboard interval cleared');
+      }
 
       const results = game.players.map(player => {
         const tapCount = player.taps?.length || 0;

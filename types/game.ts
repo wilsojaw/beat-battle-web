@@ -92,6 +92,13 @@ export interface Player {
   accuracy?: number;
   score?: number;
   taps?: TapEvent[];
+
+  // Real-time stats tracking
+  currentStreak?: number;          // Current consecutive "great" taps
+  bestStreak?: number;             // Best streak this session
+  currentRank?: number;            // Live ranking position
+  previousRank?: number;           // Rank from last update (for change detection)
+  lastMilestoneTimestamps?: Map<string, number>; // Cooldown tracking per milestone type
 }
 
 export interface TapEvent {
@@ -129,4 +136,43 @@ export interface GameResult {
   bestNoteType: NoteValue;
   worstNoteType: NoteValue;
   rank?: number;
+}
+
+// Milestone & Stats Types
+export type MilestoneType =
+  | 'streak'
+  | 'accuracy'
+  | 'competitive'
+  | 'note-specific'
+  | 'recovery';
+
+export interface MilestoneEvent {
+  id: string;                    // Unique ID for this milestone instance
+  type: MilestoneType;
+  playerId: string;
+  playerName: string;
+  message: string;               // Pre-formatted message to display
+  icon: string;                  // Emoji icon
+  broadcast: boolean;            // true = all students, false = only this student
+  timestamp: number;             // When it was triggered
+  data?: any;                    // Additional context (e.g., streak count, note type)
+}
+
+export interface LeaderboardUpdate {
+  topPlayers: Array<{           // Top 3 players
+    rank: number;
+    name: string;
+    accuracy: number;
+    hasStreak: boolean;
+  }>;
+  totalPlayers: number;
+  timestamp: number;
+}
+
+export interface PersonalStats {
+  currentStreak: number;
+  bestStreak: number;
+  currentRank: number;
+  previousRank: number;
+  accuracy: number;
 }
