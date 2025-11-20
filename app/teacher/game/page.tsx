@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { RhythmEngine } from '@/lib/rhythm-engine';
-import type { GameSegment, GameConfig } from '@/types/game';
+import type { GameSegment, GameConfig, LeaderboardUpdate } from '@/types/game';
 import { NOTE_VALUES } from '@/types/game';
 
 let socket: Socket;
@@ -24,6 +24,7 @@ function GameContent() {
   const [playerTaps, setPlayerTaps] = useState<Map<string, number>>(new Map());
   const [totalTaps, setTotalTaps] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardUpdate | null>(null);
 
   const gameStartTimeRef = useRef<number>(0);
   const configRef = useRef<GameConfig | null>(null);
@@ -176,6 +177,11 @@ function GameContent() {
       console.log(`📱 ${data.playerName} - TAP:`, JSON.stringify(data.data, null, 2));
     });
 
+    // Listen for leaderboard updates
+    socket.on('leaderboard-update', (update: LeaderboardUpdate) => {
+      setLeaderboard(update);
+    });
+
     return () => {
       // Remove all event listeners to prevent duplicates
       socket.off('connect');
@@ -186,6 +192,7 @@ function GameContent() {
       socket.off('player-joined');
       socket.off('player-left');
       socket.off('student-tap-log');
+      socket.off('leaderboard-update');
 
       if (rhythmEngine) {
         rhythmEngine.dispose();
@@ -321,7 +328,7 @@ function GameContent() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Current Note Display */}
           <div className="bg-white rounded-xl shadow-lg p-8">
             <h2 className="text-xl font-bold text-gray-700 mb-4">Current Note Value</h2>
@@ -392,6 +399,62 @@ function GameContent() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Live Leaderboard */}
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <h2 className="text-xl font-bold text-gray-700 mb-4">🏆 Live Leaderboard</h2>
+
+            {leaderboard && leaderboard.topPlayers.length > 0 ? (
+              <div className="space-y-4">
+                {leaderboard.topPlayers.map((player, index) => (
+                  <div
+                    key={player.rank}
+                    className={`rounded-lg p-4 ${
+                      index === 0
+                        ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-2 border-yellow-400'
+                        : index === 1
+                        ? 'bg-gradient-to-r from-gray-100 to-slate-100 border-2 border-gray-300'
+                        : 'bg-gradient-to-r from-orange-100 to-red-100 border-2 border-orange-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-4xl">
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                        </span>
+                        <div>
+                          <div className="text-lg font-bold text-gray-800">
+                            {player.name}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Rank #{player.rank}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-gray-800">
+                          {player.accuracy}%
+                        </div>
+                        {player.hasStreak && (
+                          <div className="text-xl">🔥</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="text-center text-sm text-gray-500 mt-4 pt-4 border-t">
+                  Total Players: {leaderboard.totalPlayers}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-400">
+                <div className="text-6xl mb-4">📊</div>
+                <p>Waiting for student data...</p>
+                <p className="text-sm mt-2">Rankings will appear as students start tapping</p>
+              </div>
+            )}
           </div>
         </div>
 
