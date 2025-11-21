@@ -17,6 +17,7 @@ function LobbyContent() {
   const [error, setError] = useState('');
   const [joinUrl, setJoinUrl] = useState('localhost:3000');
   const [copied, setCopied] = useState(false);
+  const [allPlayersReady, setAllPlayersReady] = useState(false);
 
   useEffect(() => {
     if (!roomCode) {
@@ -52,14 +53,28 @@ function LobbyContent() {
       setPlayers(prev => prev.filter(p => p.id !== data.player.id));
     });
 
+    socket.on('player-connection-status', (data: { playerName: string; connected: boolean; allPlayersReady: boolean }) => {
+      console.log('Player connection status update:', data);
+      setPlayers(prev => prev.map(p =>
+        p.name === data.playerName ? { ...p, connected: data.connected } : p
+      ));
+      setAllPlayersReady(data.allPlayersReady);
+    });
+
     return () => {
       // Don't disconnect socket - we need it for the game page
+      socket.off('player-connection-status');
     };
   }, [roomCode, router]);
 
   const startGame = () => {
     if (players.length === 0) {
       setError('Wait for at least one player to join!');
+      return;
+    }
+
+    if (!allPlayersReady) {
+      setError('Some players are still connecting. Please wait...');
       return;
     }
 
@@ -168,7 +183,7 @@ function LobbyContent() {
                 {players.map((player, index) => (
                   <div
                     key={player.id}
-                    className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4 border-2 border-purple-200 animate-fade-in"
+                    className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4 border-2 border-purple-200 animate-fade-in relative"
                   >
                     <div className="text-center">
                       <div className="text-3xl mb-2">🎵</div>
@@ -177,6 +192,19 @@ function LobbyContent() {
                       </div>
                       <div className="text-sm text-gray-600 mt-1">
                         Player {index + 1}
+                      </div>
+                      <div className="mt-2">
+                        {player.connected ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                            <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
+                            Ready
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">
+                            <span className="w-2 h-2 bg-yellow-600 rounded-full"></span>
+                            Connecting...
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -197,10 +225,10 @@ function LobbyContent() {
 
             <button
               onClick={startGame}
-              disabled={loading || players.length === 0}
+              disabled={loading || players.length === 0 || !allPlayersReady}
               className="flex-1 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
             >
-              {loading ? 'Starting...' : `Start Beat Battle ${players.length > 0 ? `(${players.length} ${players.length === 1 ? 'player' : 'players'})` : ''}`}
+              {loading ? 'Starting...' : !allPlayersReady && players.length > 0 ? 'Waiting for all players to connect...' : `Start Beat Battle ${players.length > 0 ? `(${players.length} ${players.length === 1 ? 'player' : 'players'})` : ''}`}
             </button>
           </div>
         </div>

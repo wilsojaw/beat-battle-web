@@ -9,6 +9,13 @@ import { NOTE_VALUES } from '@/types/game';
 import { LeaderboardPanel } from '@/components/LeaderboardPanel';
 import { MilestoneToast } from '@/components/MilestoneToast';
 
+// Store socket on window to persist across hot reloads and page navigations
+declare global {
+  interface Window {
+    studentSocket?: Socket;
+  }
+}
+
 let socket: Socket;
 let rhythmEngine: RhythmEngine | null = null;
 
@@ -45,6 +52,12 @@ function GameContent() {
   const segmentsRef = useRef<GameSegment[]>([]);
   const tapAreaRef = useRef<HTMLDivElement>(null);
   const configRef = useRef<GameConfig | null>(null);
+  const timeOffsetRef = useRef<number>(0);
+
+  // Get synchronized server time
+  const getSyncedTime = () => {
+    return Date.now() + timeOffsetRef.current;
+  };
 
   const handleGameStart = async (data: {
     startTime: number;
@@ -52,7 +65,24 @@ function GameContent() {
     currentSegment: GameSegment;
     config: GameConfig;
   }) => {
-    const localReceiveTime = Date.now();
+    console.log('🎮 handleGameStart CALLED with data:', {
+      startTime: data.startTime,
+      segmentCount: data.segments.length,
+      currentSegment: data.currentSegment?.noteValue,
+      tempo: data.config?.tempo
+    });
+
+    // Load time offset from sessionStorage (might be null if clock sync hasn't finished)
+    const storedOffset = sessionStorage.getItem('timeOffset');
+    timeOffsetRef.current = storedOffset ? parseFloat(storedOffset) : 0;
+
+    if (timeOffsetRef.current === 0) {
+      console.warn('⚠️ Clock sync not complete yet, using 0ms offset');
+    } else {
+      console.log(`⏰ Using time offset: ${timeOffsetRef.current}ms`);
+    }
+
+    const localReceiveTime = getSyncedTime();
 
     // Store config for use in tap handling
     configRef.current = data.config;
@@ -123,11 +153,37 @@ function GameContent() {
     const countInDuration = measureDuration; // 1 measure count-in
 
     const measureInterval = setInterval(() => {
-      const elapsed = Date.now() - data.startTime;
+      const elapsed = getSyncedTime() - data.startTime;
 
       // Account for count-in: measure 0 during count-in, then 1-based
       const currentMeasureNum = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
       const totalMeas = data.segments[data.segments.length - 1]?.endMeasure || 16;
+
+      // Also check for segment changes based on synced time
+      const currentSeg = data.segments.find(seg =>
+        elapsed >= seg.startTime && elapsed < seg.endTime
+      );
+
+      if (currentSeg && currentSeg.noteValue !== currentSegmentRef.current?.noteValue) {
+        // Save previous segment before updating
+        previousSegmentRef.current = currentSegmentRef.current;
+        currentSegmentRef.current = currentSeg;
+        tapsInCurrentSegmentRef.current = 0;
+
+        console.log(`🔄 [Synced] Segment changed: ${previousSegmentRef.current?.noteValue} -> ${currentSeg.noteValue}`);
+
+        setCurrentSegment(currentSeg);
+
+        // Find next segment
+        const currentIndex = data.segments.findIndex(s =>
+          s.noteValue === currentSeg.noteValue && s.startTime === currentSeg.startTime
+        );
+        if (currentIndex >= 0 && currentIndex < data.segments.length - 1) {
+          setNextSegment(data.segments[currentIndex + 1]);
+        } else {
+          setNextSegment(null);
+        }
+      }
 
       if (currentMeasureNum <= totalMeas) {
         setCurrentMeasure(Math.max(0, currentMeasureNum)); // Show 0 during count-in
@@ -146,19 +202,51 @@ function GameContent() {
       return;
     }
 
-    // Reuse existing socket or create new one
-    if (!socket || !socket.connected) {
+    // Reuse existing socket from window or create new one
+    if (typeof window !== 'undefined' && window.studentSocket) {
+      console.log('♻️ Reusing existing student socket, connected:', window.studentSocket.connected);
+      socket = window.studentSocket;
+    } else if (!socket) {
+      console.log('🆕 Creating new socket connection');
       socket = io();
+      if (typeof window !== 'undefined') {
+        window.studentSocket = socket;
+      }
     }
+
+    console.log('🔌 Socket status at mount:', {
+      connected: socket.connected,
+      id: socket.id
+    });
+
+    // Remove old listeners first to prevent duplicates when component remounts
+    console.log('🧹 Removing old listeners before registering new ones');
+    socket.off('connect');
+    socket.off('countdown-start');
+    socket.off('countdown-tick');
+    socket.off('game-started');
+    socket.off('segment-changed');
+    socket.off('game-ended');
+    socket.off('teacher-disconnected');
+    socket.off('milestone-achieved');
+    socket.off('leaderboard-update');
+    socket.off('personal-stats-update');
 
     // Rejoin room and request game state when socket connects
     const rejoinAndRequestState = () => {
+      console.log('🔄 Rejoining room and requesting game state');
       // First rejoin to update socket ID on server
       socket.emit('student-rejoin', { roomCode, playerName });
 
       // Then request game state
       socket.emit('get-game-state', { roomCode }, (response: any) => {
+        console.log('📥 get-game-state response:', {
+          success: response.success,
+          status: response.game?.status,
+          hasStartTime: !!response.game?.startTime
+        });
         if (response.success && response.game.status === 'playing') {
+          console.log('🎮 Game already playing, calling handleGameStart from get-game-state');
           handleGameStart({
             startTime: response.game.startTime,
             segments: response.game.segments,
@@ -171,11 +259,13 @@ function GameContent() {
 
     // If socket is already connected, rejoin and request immediately
     if (socket.connected) {
+      console.log('✅ Socket already connected, rejoining immediately');
       rejoinAndRequestState();
     }
 
     // Also listen for connect event in case socket isn't connected yet
     socket.on('connect', () => {
+      console.log('🔌 Socket connected event fired, socket.id:', socket.id);
       rejoinAndRequestState();
     });
 
@@ -189,15 +279,18 @@ function GameContent() {
       setCountdown(data.countdown);
     });
 
+    console.log('🔧 Registering game-started event listener');
     socket.on('game-started', async (data: {
       startTime: number;
       segments: GameSegment[];
       currentSegment: GameSegment;
       config: GameConfig;
     }) => {
+      console.log('🎮 GAME-STARTED EVENT RECEIVED!', data);
       setCountdown(null);
       handleGameStart(data);
     });
+    console.log('✅ game-started listener registered');
 
     socket.on('segment-changed', (data: { segment: GameSegment }) => {
       // Save previous segment before updating
@@ -256,17 +349,11 @@ function GameContent() {
     });
 
     return () => {
-      // Remove all event listeners to prevent duplicates
-      socket.off('connect');
-      socket.off('countdown-start');
-      socket.off('countdown-tick');
-      socket.off('game-started');
-      socket.off('segment-changed');
-      socket.off('game-ended');
-      socket.off('teacher-disconnected');
-      socket.off('milestone-achieved');
-      socket.off('leaderboard-update');
-      socket.off('personal-stats-update');
+      console.log('🧹 Cleanup: useEffect unmounting');
+      // DON'T remove socket listeners here!
+      // We're persisting the socket across page navigations and hot reloads,
+      // so removing listeners causes them to be missing when events fire.
+      // Socket.io will handle duplicate listeners automatically.
 
       // Clean up measure interval
       if ((window as any).measureInterval) {
@@ -283,9 +370,9 @@ function GameContent() {
   const handleTap = () => {
     if (!isPlaying || !currentSegmentRef.current || !rhythmEngine) return;
 
-    const localTapTime = Date.now();
-    const tapTimeSinceLocalStart = localTapTime - gameStartTimeRef.current;
-    const tapTimeSinceServerStart = localTapTime - serverStartTimeRef.current;
+    const syncedTapTime = getSyncedTime();
+    const tapTimeSinceLocalStart = syncedTapTime - gameStartTimeRef.current;
+    const tapTimeSinceServerStart = syncedTapTime - serverStartTimeRef.current;
 
     // Determine which segment's interval to use for accuracy calculation
     // For the first tap in a new segment, use the PREVIOUS segment's expected interval
@@ -328,13 +415,13 @@ function GameContent() {
 
     // Log detailed timing info
     const tapLog = {
-      localTapTime: localTapTime,
+      syncedTapTime: syncedTapTime,
       tapTimeSinceLocalStart: tapTimeSinceLocalStart.toFixed(2) + 'ms',
       tapTimeSinceServerStart: tapTimeSinceServerStart.toFixed(2) + 'ms',
       interval: interval.toFixed(2) + 'ms',
       expectedInterval: expectedInterval.toFixed(2) + 'ms',
       accuracy: accuracy.toFixed(2) + 'ms',
-      noteValue: currentSegment.noteValue,
+      noteValue: currentSegment?.noteValue,
       isAccurate: isAccurate,
       isFirstTap: interval === 0
     };

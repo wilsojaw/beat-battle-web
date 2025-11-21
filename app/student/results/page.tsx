@@ -11,8 +11,8 @@ let socket: Socket;
 function ResultsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const roomCode = searchParams.get('code') || sessionStorage.getItem('roomCode') || '';
-  const playerName = sessionStorage.getItem('playerName') || 'Player';
+  const roomCode = searchParams.get('code') || (typeof window !== 'undefined' ? sessionStorage.getItem('roomCode') : '') || '';
+  const playerName = (typeof window !== 'undefined' ? sessionStorage.getItem('playerName') : '') || 'Player';
 
   const [result, setResult] = useState<GameResult | null>(null);
   const [rank, setRank] = useState<number | null>(null);

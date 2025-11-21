@@ -92,6 +92,7 @@ export interface Player {
   accuracy?: number;
   score?: number;
   taps?: TapEvent[];
+  connected?: boolean;             // Socket connection status
 
   // Real-time stats tracking
   currentStreak?: number;          // Current consecutive "great" taps

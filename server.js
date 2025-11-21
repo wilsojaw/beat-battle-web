@@ -544,7 +544,15 @@ app.prepare().then(() => {
         if (player) {
           const oldSocketId = player.id;
           player.id = socket.id;
+          player.connected = true;  // Mark as connected
           console.log(`✅ Student ${playerName} rejoined room: ${data.roomCode}, updated socket ID from ${oldSocketId} to ${socket.id}, game status: ${game.status}`);
+
+          // Notify teacher of updated connection status
+          io.to(data.roomCode).emit('player-connection-status', {
+            playerName: playerName,
+            connected: true,
+            allPlayersReady: game.players.every(p => p.connected)
+          });
         } else {
           console.log(`⚠️ Student rejoined room: ${data.roomCode} with socket ID: ${socket.id}, but player not found in game, game status: ${game.status}`);
         }
@@ -558,6 +566,15 @@ app.prepare().then(() => {
           socket.emit('player-count-update', { totalPlayers: game.players.length });
         }
       }
+    });
+
+    // Time synchronization endpoint
+    socket.on('time-sync', (data, callback) => {
+      const serverTime = Date.now();
+      callback({
+        serverTime: serverTime,
+        clientTime: data.clientTime
+      });
     });
 
     socket.on('get-game-state', (data, callback) => {
@@ -625,7 +642,8 @@ app.prepare().then(() => {
         id: socket.id,
         name: data.playerName,
         isTeacher: false,
-        taps: []
+        taps: [],
+        connected: true  // Track connection status
       };
 
       game.players.push(player);
@@ -884,11 +902,23 @@ app.prepare().then(() => {
           const playerIndex = game.players.findIndex(p => p.id === socket.id);
           if (playerIndex !== -1) {
             const player = game.players[playerIndex];
-            game.players.splice(playerIndex, 1);
-            io.to(roomCode).emit('player-left', {
-              player,
-              totalPlayers: game.players.length
-            });
+
+            // If game is in lobby, remove player completely
+            if (game.status === 'lobby') {
+              game.players.splice(playerIndex, 1);
+              io.to(roomCode).emit('player-left', {
+                player,
+                totalPlayers: game.players.length
+              });
+            } else {
+              // If game is running, just mark as disconnected (keep their data)
+              player.connected = false;
+              io.to(roomCode).emit('player-connection-status', {
+                playerName: player.name,
+                connected: false,
+                allPlayersReady: game.players.every(p => p.connected)
+              });
+            }
           }
         }
       });

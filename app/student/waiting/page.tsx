@@ -4,6 +4,13 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 
+// Store socket on window to persist across hot reloads and page navigations
+declare global {
+  interface Window {
+    studentSocket?: Socket;
+  }
+}
+
 let socket: Socket;
 
 function WaitingContent() {
@@ -30,21 +37,26 @@ function WaitingContent() {
       return;
     }
 
-    // Reuse existing socket or create new one
-    if (!socket || !socket.connected) {
+    // Reuse existing socket from window or create new one
+    if (typeof window !== 'undefined' && window.studentSocket) {
+      socket = window.studentSocket;
+    } else if (!socket) {
       socket = io();
+      if (typeof window !== 'undefined') {
+        window.studentSocket = socket;
+      }
     }
 
     console.log('Student waiting page - socket connected:', socket.connected, 'socket id:', socket.id);
 
     // Make sure we're in the room to receive game-started event
     if (socket.connected) {
-      socket.emit('student-rejoin', { roomCode });
+      socket.emit('student-rejoin', { roomCode, playerName });
     }
 
     socket.on('connect', () => {
       console.log('Student socket connected in waiting room');
-      socket.emit('student-rejoin', { roomCode });
+      socket.emit('student-rejoin', { roomCode, playerName });
     });
 
     socket.on('player-count-update', (data: { totalPlayers: number }) => {
@@ -65,6 +77,11 @@ function WaitingContent() {
       console.log('⏱️ Countdown start:', data.countdown);
       setCountdown(data.countdown);
 
+      // Navigate to game page immediately when countdown starts
+      // This ensures students are already there before game-started event
+      console.log('🎮 Navigating to game page for countdown...');
+      router.push(`/student/game?code=${roomCode}`);
+
       // Pre-initialize Tone.js audio context during countdown to reduce lag
       try {
         const Tone = await import('tone');
@@ -78,14 +95,7 @@ function WaitingContent() {
     socket.on('countdown-tick', (data: { countdown: number }) => {
       console.log('⏱️ Countdown tick:', data.countdown);
       setCountdown(data.countdown);
-
-      // Navigate to game page when countdown hits 1 (before metronome starts)
-      // This ensures students see the game screen before hearing the metronome
-      if (data.countdown === 1) {
-        setTimeout(() => {
-          router.push(`/student/game?code=${roomCode}`);
-        }, 100);
-      }
+      // No longer navigate here - we navigate on countdown-start instead
     });
 
     socket.on('game-started', (data: any) => {
@@ -107,7 +117,7 @@ function WaitingContent() {
     return () => {
       // Don't disconnect socket - we need it for the game page
     };
-  }, [roomCode, router]);
+  }, [roomCode, playerName, router]);
 
   if (countdown !== null) {
     return (
