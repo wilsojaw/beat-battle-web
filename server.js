@@ -6,7 +6,7 @@ const { Server } = require('socket.io');
 const dev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000', 10);
 
-console.log('🚀 Starting server...');
+console.log('Starting server...');
 console.log('Environment:', { dev, port, NODE_ENV: process.env.NODE_ENV });
 
 const app = next({ dev });
@@ -347,13 +347,11 @@ function generateGameSegments(config) {
 }
 
 function logTimingDataForExcel(game) {
-  console.log('\n========== TIMING DATA FOR EXCEL ==========');
-  console.log(`Tempo: ${game.config.tempo} BPM`);
-  console.log(`Game Start Time: ${game.startTime}`);
-  console.log(`Total Players: ${game.players.length}`);
-  console.log('\n--- COPY BELOW THIS LINE ---');
+  console.log('\n========== TIMING DATA CSV ==========');
+  console.log(`Tempo: ${game.config.tempo} BPM | Game Start: ${game.startTime} | Players: ${game.players.length}`);
+  console.log('--- CSV DATA START ---');
 
-  // Header row (tab-separated)
+  // Header row (comma-separated)
   console.log([
     'Player Name',
     'Measure',
@@ -361,12 +359,12 @@ function logTimingDataForExcel(game) {
     'Note Value',
     'Expected Interval (ms)',
     'Tap Number',
-    'Tap Timestamp (ms from start)',
+    'Tap Timestamp (ms)',
     'Actual Interval (ms)',
     'Interval Error (ms)',
     'Accuracy (%)',
-    'Global Time (epoch ms)'
-  ].join('\t'));
+    'Global Time (ms)'
+  ].join(','));
 
   const beatDuration = (60 / game.config.tempo) * 1000; // ms per beat
   const beatsPerMeasure = 4;
@@ -405,7 +403,7 @@ function logTimingDataForExcel(game) {
       console.log([
         player.name,
         measureNum,
-        segment ? `${segment.startMeasure}-${segment.endMeasure}` : 'N/A',
+        `${segment.startMeasure}-${segment.endMeasure}`,
         tap.noteValue || 'unknown',
         expectedInterval.toFixed(2),
         index + 1,
@@ -413,13 +411,12 @@ function logTimingDataForExcel(game) {
         actualInterval.toFixed(2),
         intervalError.toFixed(2),
         accuracyPercent.toFixed(2),
-        globalTime
-      ].join('\t'));
+        globalTime.toFixed(2)
+      ].join(','));
     });
   });
 
-  console.log('--- END OF DATA ---\n');
-  console.log('===========================================\n');
+  console.log('--- CSV DATA END ---');
 }
 
 function calculatePlayerAccuracy(taps) {
@@ -509,7 +506,7 @@ app.prepare().then(() => {
   });
 
   io.on('connection', (socket) => {
-    console.log('Client connected:', socket.id);
+    // Client connected
 
     socket.on('teacher-rejoin', (data) => {
       const game = games.get(data.roomCode);
@@ -589,7 +586,7 @@ app.prepare().then(() => {
       // Join room if not already in it
       socket.join(data.roomCode);
 
-      console.log(`Sending game state for room ${data.roomCode}, status: ${game.status}`);
+      // Sending game state
 
       callback({
         success: true,
@@ -748,7 +745,7 @@ app.prepare().then(() => {
       }
 
       player.taps.push(data.tap);
-      console.log(`✅ Tap recorded for ${player.name}: ${player.taps.length} total taps`);
+      // Tap recorded
 
       // Calculate current stats
       const currentStreak = calculateCurrentStreak(player.taps);
@@ -900,7 +897,7 @@ app.prepare().then(() => {
     });
 
     socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
+      // Client disconnected
 
       games.forEach((game, roomCode) => {
         if (game.teacher.id === socket.id) {
@@ -934,15 +931,12 @@ app.prepare().then(() => {
     });
   });
 
-  console.log(`🎵 Attempting to bind HTTP server to 0.0.0.0:${port}...`);
-
   httpServer
     .once('error', (err) => {
-      console.error('❌ Server error:', err);
+      console.error('Server error:', err);
       process.exit(1);
     })
     .listen(port, '0.0.0.0', () => {
-      console.log(`✅ Server ready on http://0.0.0.0:${port}`);
-      console.log(`📡 Socket.IO initialized and ready for connections`);
+      console.log(`Server ready on http://0.0.0.0:${port}`);
     });
 });
