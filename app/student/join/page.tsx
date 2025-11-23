@@ -36,61 +36,68 @@ export default function StudentJoin() {
 
     try {
       // Connect to Socket.io server - reuse existing socket if available
-      if (typeof window !== 'undefined' && window.studentSocket) {
+      if (typeof window !== 'undefined' && window.studentSocket && window.studentSocket.connected) {
+        console.log('♻️ Reusing existing student socket');
         socket = window.studentSocket;
       } else {
+        console.log('🆕 Creating new student socket');
         socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
         if (typeof window !== 'undefined') {
           window.studentSocket = socket;
         }
+
+        // Only set up connect listener for NEW sockets
+        socket.once('connect', () => {
+          console.log('Student connected to Socket.io:', socket.id);
+
+          // Perform clock synchronization in background (non-blocking)
+          (async () => {
+            console.log('🕐 Starting clock synchronization...');
+            const offsets: number[] = [];
+
+            for (let i = 0; i < 5; i++) {
+              const clientSendTime = Date.now();
+
+              await new Promise<void>((resolve) => {
+                socket.emit('time-sync', { clientTime: clientSendTime }, (response: any) => {
+                  const clientReceiveTime = Date.now();
+                  const roundTripTime = clientReceiveTime - clientSendTime;
+                  const serverTime = response.serverTime;
+
+                  // Calculate offset: server time - estimated client time when server responded
+                  const estimatedClientTimeAtServer = clientSendTime + (roundTripTime / 2);
+                  const offset = serverTime - estimatedClientTimeAtServer;
+
+                  offsets.push(offset);
+                  console.log(`Ping ${i + 1}: RTT=${roundTripTime}ms, Offset=${offset}ms`);
+                  resolve();
+                });
+              });
+
+              // Small delay between pings
+              if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            // Calculate median offset (ignore outliers)
+            offsets.sort((a, b) => a - b);
+            const medianOffset = offsets[Math.floor(offsets.length / 2)];
+
+            console.log(`✅ Clock sync complete! Median offset: ${medianOffset}ms`);
+
+            // Store the time offset
+            sessionStorage.setItem('timeOffset', medianOffset.toString());
+          })(); // Run in background, don't await
+        });
       }
 
-      socket.on('connect', () => {
-        console.log('Student connected to Socket.io:', socket.id);
-
-        // Perform clock synchronization in background (non-blocking)
-        (async () => {
-          console.log('🕐 Starting clock synchronization...');
-          const offsets: number[] = [];
-
-          for (let i = 0; i < 5; i++) {
-            const clientSendTime = Date.now();
-
-            await new Promise<void>((resolve) => {
-              socket.emit('time-sync', { clientTime: clientSendTime }, (response: any) => {
-                const clientReceiveTime = Date.now();
-                const roundTripTime = clientReceiveTime - clientSendTime;
-                const serverTime = response.serverTime;
-
-                // Calculate offset: server time - estimated client time when server responded
-                const estimatedClientTimeAtServer = clientSendTime + (roundTripTime / 2);
-                const offset = serverTime - estimatedClientTimeAtServer;
-
-                offsets.push(offset);
-                console.log(`Ping ${i + 1}: RTT=${roundTripTime}ms, Offset=${offset}ms`);
-                resolve();
-              });
-            });
-
-            // Small delay between pings
-            if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
-          }
-
-          // Calculate median offset (ignore outliers)
-          offsets.sort((a, b) => a - b);
-          const medianOffset = offsets[Math.floor(offsets.length / 2)];
-
-          console.log(`✅ Clock sync complete! Median offset: ${medianOffset}ms`);
-
-          // Store the time offset
-          sessionStorage.setItem('timeOffset', medianOffset.toString());
-        })(); // Run in background, don't await
-      });
-
-      // Wait for connection then join immediately (don't wait for clock sync)
+      // Wait for connection if not already connected
       if (!socket.connected) {
+        console.log('⏳ Waiting for socket to connect...');
         await new Promise<void>((resolve) => {
-          socket.once('connect', () => resolve());
+          socket.once('connect', () => {
+            console.log('✅ Socket connected!');
+            resolve();
+          });
         });
       }
 
