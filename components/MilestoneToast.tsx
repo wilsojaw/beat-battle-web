@@ -40,7 +40,7 @@ export function MilestoneToast({ milestones }: MilestoneToastProps) {
   return (
     <div className="
       fixed
-      bottom-4 left-4
+      top-20 left-4
       z-50 flex flex-col gap-2
       pointer-events-none
       max-w-xs sm:max-w-sm
