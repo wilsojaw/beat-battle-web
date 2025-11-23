@@ -53,6 +53,7 @@ function GameContent() {
   const tapAreaRef = useRef<HTMLDivElement>(null);
   const configRef = useRef<GameConfig | null>(null);
   const timeOffsetRef = useRef<number>(0);
+  const listenersSetupRef = useRef<boolean>(false);
 
   // Get synchronized server time
   const getSyncedTime = () => {
@@ -216,21 +217,9 @@ function GameContent() {
 
     console.log('🔌 Socket status at mount:', {
       connected: socket.connected,
-      id: socket.id
+      id: socket.id,
+      listenersAlreadySetup: listenersSetupRef.current
     });
-
-    // Remove old listeners first to prevent duplicates when component remounts
-    console.log('🧹 Removing old listeners before registering new ones');
-    socket.off('connect');
-    socket.off('countdown-start');
-    socket.off('countdown-tick');
-    socket.off('game-started');
-    socket.off('segment-changed');
-    socket.off('game-ended');
-    socket.off('teacher-disconnected');
-    socket.off('milestone-achieved');
-    socket.off('leaderboard-update');
-    socket.off('personal-stats-update');
 
     // Rejoin room and request game state when socket connects
     const rejoinAndRequestState = () => {
@@ -263,6 +252,29 @@ function GameContent() {
         }
       });
     };
+
+    // Only remove/add listeners if they haven't been set up yet
+    // This prevents removing listeners during countdown → game transition
+    if (!listenersSetupRef.current) {
+      console.log('🧹 Removing old listeners before registering new ones');
+      socket.off('connect');
+      socket.off('countdown-start');
+      socket.off('countdown-tick');
+      socket.off('game-started');
+      socket.off('segment-changed');
+      socket.off('game-ended');
+      socket.off('teacher-disconnected');
+      socket.off('milestone-achieved');
+      socket.off('leaderboard-update');
+      socket.off('personal-stats-update');
+    } else {
+      console.log('✅ Listeners already set up, skipping cleanup/re-registration');
+      // Still need to rejoin the room though
+      if (socket.connected) {
+        rejoinAndRequestState();
+      }
+      return;
+    }
 
     // If socket is already connected, rejoin and request immediately
     if (socket.connected) {
@@ -354,6 +366,10 @@ function GameContent() {
         setCurrentAccuracy(stats.accuracy);
       }
     });
+
+    // Mark listeners as set up
+    listenersSetupRef.current = true;
+    console.log('✅ All listeners registered and marked as setup');
 
     return () => {
       console.log('🧹 Cleanup: useEffect unmounting');
