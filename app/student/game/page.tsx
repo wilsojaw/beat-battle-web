@@ -219,9 +219,18 @@ function GameContent() {
       id: socket.id
     });
 
-    // DON'T remove listeners at the start - Socket.io handles duplicate listeners
-    // Removing listeners here causes race conditions where events fire during re-registration
-    console.log('🔧 Setting up socket listeners (Socket.io handles duplicates automatically)');
+    // Remove old listeners first to prevent duplicates when component remounts
+    console.log('🧹 Removing old listeners before registering new ones');
+    socket.off('connect');
+    socket.off('countdown-start');
+    socket.off('countdown-tick');
+    socket.off('game-started');
+    socket.off('segment-changed');
+    socket.off('game-ended');
+    socket.off('teacher-disconnected');
+    socket.off('milestone-achieved');
+    socket.off('leaderboard-update');
+    socket.off('personal-stats-update');
 
     // Rejoin room and request game state when socket connects
     const rejoinAndRequestState = () => {
@@ -278,8 +287,7 @@ function GameContent() {
     });
 
     console.log('🔧 Registering game-started event listener');
-    // Use .once() since game-started only fires once per game
-    socket.once('game-started', async (data: {
+    socket.on('game-started', async (data: {
       startTime: number;
       segments: GameSegment[];
       currentSegment: GameSegment;
