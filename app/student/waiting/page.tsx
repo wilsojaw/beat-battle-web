@@ -20,6 +20,8 @@ function WaitingContent() {
   const [playerName, setPlayerName] = useState('Player');
 
   const [playerCount, setPlayerCount] = useState(1);
+  const [playerNames, setPlayerNames] = useState<string[]>([]);
+  const [gameConfig, setGameConfig] = useState<any>(null);
   const [status, setStatus] = useState('Waiting for teacher to start...');
   const [countdown, setCountdown] = useState<number | null>(null);
 
@@ -41,7 +43,7 @@ function WaitingContent() {
     if (typeof window !== 'undefined' && window.studentSocket) {
       socket = window.studentSocket;
     } else if (!socket) {
-      socket = io();
+      socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
       if (typeof window !== 'undefined') {
         window.studentSocket = socket;
       }
@@ -64,13 +66,22 @@ function WaitingContent() {
       setPlayerCount(data.totalPlayers);
     });
 
-    socket.on('player-joined', (data: { totalPlayers: number }) => {
+    socket.on('player-joined', (data: { totalPlayers: number; playerNames?: string[]; config?: any }) => {
       console.log('Player joined event in waiting room:', data);
       setPlayerCount(data.totalPlayers);
+      if (data.playerNames) {
+        setPlayerNames(data.playerNames);
+      }
+      if (data.config) {
+        setGameConfig(data.config);
+      }
     });
 
-    socket.on('player-left', (data: { totalPlayers: number }) => {
+    socket.on('player-left', (data: { totalPlayers: number; playerNames?: string[] }) => {
       setPlayerCount(data.totalPlayers);
+      if (data.playerNames) {
+        setPlayerNames(data.playerNames);
+      }
     });
 
     socket.on('countdown-start', async (data: { countdown: number }) => {
@@ -149,9 +160,9 @@ function WaitingContent() {
             </p>
           </div>
 
-          {/* Player Count */}
+          {/* Player Count and Names */}
           <div className="bg-gradient-to-r from-green-100 to-blue-100 rounded-lg p-6 mb-8">
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-3 mb-4">
               <span className="text-4xl">👥</span>
               <div>
                 <p className="text-3xl font-bold text-gray-700">
@@ -162,7 +173,52 @@ function WaitingContent() {
                 </p>
               </div>
             </div>
+            {playerNames.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-green-300">
+                <p className="text-xs text-gray-600 mb-2 font-semibold">Players:</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {playerNames.map((name, idx) => (
+                    <span
+                      key={idx}
+                      className="bg-white px-3 py-1 rounded-full text-sm text-gray-700 shadow-sm"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Game Mechanics */}
+          {gameConfig && (
+            <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg p-6 mb-8">
+              <h3 className="font-semibold text-purple-900 mb-3 text-lg">🎮 Game Setup</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="bg-white rounded-lg p-3">
+                  <p className="text-gray-600 text-xs mb-1">Total Measures</p>
+                  <p className="text-2xl font-bold text-purple-600">{gameConfig.totalMeasures}</p>
+                </div>
+                <div className="bg-white rounded-lg p-3">
+                  <p className="text-gray-600 text-xs mb-1">Measures per Note</p>
+                  <p className="text-2xl font-bold text-pink-600">{gameConfig.measuresPerSegment}</p>
+                </div>
+              </div>
+              <div className="mt-4 bg-white rounded-lg p-3">
+                <p className="text-gray-600 text-xs mb-2">Note Values in Game:</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {gameConfig.noteValues?.map((note: string, idx: number) => (
+                    <span
+                      key={idx}
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1 rounded-full text-sm font-semibold"
+                    >
+                      {note}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Instructions */}
           <div className="bg-blue-50 rounded-lg p-6">

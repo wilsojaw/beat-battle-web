@@ -39,7 +39,7 @@ export default function StudentJoin() {
       if (typeof window !== 'undefined' && window.studentSocket) {
         socket = window.studentSocket;
       } else {
-        socket = io();
+        socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
         if (typeof window !== 'undefined') {
           window.studentSocket = socket;
         }

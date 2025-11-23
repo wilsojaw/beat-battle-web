@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { RhythmEngine } from '@/lib/rhythm-engine';
-import type { NoteValue, GameSegment, TapEvent, LeaderboardUpdate, MilestoneEvent, PersonalStats } from '@/types/game';
+import type { NoteValue, GameSegment, TapEvent, LeaderboardUpdate, MilestoneEvent, PersonalStats, GameConfig } from '@/types/game';
 import { NOTE_VALUES } from '@/types/game';
 import { LeaderboardPanel } from '@/components/LeaderboardPanel';
 import { MilestoneToast } from '@/components/MilestoneToast';
@@ -208,7 +208,7 @@ function GameContent() {
       socket = window.studentSocket;
     } else if (!socket) {
       console.log('🆕 Creating new socket connection');
-      socket = io();
+      socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
       if (typeof window !== 'undefined') {
         window.studentSocket = socket;
       }

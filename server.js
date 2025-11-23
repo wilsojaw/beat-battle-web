@@ -649,7 +649,12 @@ app.prepare().then(() => {
       game.players.push(player);
       socket.join(data.roomCode);
 
-      io.to(data.roomCode).emit('player-joined', { player, totalPlayers: game.players.length });
+      io.to(data.roomCode).emit('player-joined', {
+        player,
+        totalPlayers: game.players.length,
+        playerNames: game.players.map(p => p.name),
+        config: game.config
+      });
 
       console.log(`${data.playerName} joined game ${data.roomCode}`);
       callback({ success: true, gameState: game });
@@ -908,7 +913,8 @@ app.prepare().then(() => {
               game.players.splice(playerIndex, 1);
               io.to(roomCode).emit('player-left', {
                 player,
-                totalPlayers: game.players.length
+                totalPlayers: game.players.length,
+                playerNames: game.players.map(p => p.name)
               });
             } else {
               // If game is running, just mark as disconnected (keep their data)

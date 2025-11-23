@@ -27,7 +27,7 @@ function ResultsContent() {
 
     // Reuse existing socket (should already be connected from game page)
     if (!socket) {
-      socket = io();
+      socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
     }
 
     const handleGameEnded = (data: { results: GameResult[] }) => {

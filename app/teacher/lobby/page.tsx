@@ -29,7 +29,7 @@ function LobbyContent() {
     setJoinUrl(window.location.origin);
 
     // Connect to Socket.io
-    socket = io();
+    socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
 
     socket.on('connect', () => {
       console.log('Teacher connected to Socket.io:', socket.id);

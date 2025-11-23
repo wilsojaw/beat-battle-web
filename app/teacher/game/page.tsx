@@ -100,7 +100,7 @@ function GameContent() {
 
     // Reuse existing socket or create new one
     if (!socket || !socket.connected) {
-      socket = io();
+      socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
     }
 
     // Rejoin room and request game state when socket connects

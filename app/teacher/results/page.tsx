@@ -24,7 +24,7 @@ function ResultsContent() {
 
     // Reuse existing socket (should already be connected from game page)
     if (!socket) {
-      socket = io();
+      socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
     }
 
     // Set up listener first before rejoining

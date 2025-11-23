@@ -16,8 +16,12 @@ export function MilestoneToast({ milestones }: MilestoneToastProps) {
     // Get the latest milestone
     const latestMilestone = milestones[milestones.length - 1];
 
-    // Add it to visible milestones
-    setVisibleMilestones((prev) => [...prev, latestMilestone]);
+    // Add it to visible milestones, but limit to 2 max
+    setVisibleMilestones((prev) => {
+      const newList = [...prev, latestMilestone];
+      // Keep only the last 2 milestones
+      return newList.slice(-2);
+    });
 
     // Remove it after 3 seconds
     const timeout = setTimeout(() => {
@@ -35,18 +39,16 @@ export function MilestoneToast({ milestones }: MilestoneToastProps) {
 
   return (
     <div className="
-      absolute
-      top-16 left-1/2 -translate-x-1/2
-      sm:top-24
+      fixed
+      bottom-4 left-4
       z-50 flex flex-col gap-2
       pointer-events-none
-      w-[90%] sm:w-auto
-      max-w-md sm:max-w-xl
+      max-w-xs sm:max-w-sm
     ">
       {visibleMilestones.map((milestone) => (
         <div
           key={milestone.id}
-          className="animate-in slide-in-from-top-5 fade-in duration-300 animate-out slide-out-to-top-5 fade-out delay-2700"
+          className="animate-in slide-in-from-left-5 fade-in duration-300"
         >
           <div className="
             bg-gradient-to-r from-purple-600/90 to-pink-600/90

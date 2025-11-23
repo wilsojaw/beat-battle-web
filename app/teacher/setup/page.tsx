@@ -61,7 +61,7 @@ export default function TeacherSetup() {
 
     try {
       // Connect to Socket.io server
-      socket = io();
+      socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
 
       const config: GameConfig = {
         tempo,
