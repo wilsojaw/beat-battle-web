@@ -598,7 +598,8 @@ app.prepare().then(() => {
           startTime: game.startTime,
           segments: game.segments,
           currentSegment: game.currentSegment,
-          config: game.config
+          config: game.config,
+          countdown: game.countdown
         }
       });
     });

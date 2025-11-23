@@ -243,16 +243,23 @@ function GameContent() {
         console.log('📥 get-game-state response:', {
           success: response.success,
           status: response.game?.status,
-          hasStartTime: !!response.game?.startTime
+          hasStartTime: !!response.game?.startTime,
+          countdown: response.game?.countdown
         });
-        if (response.success && response.game.status === 'playing') {
-          console.log('🎮 Game already playing, calling handleGameStart from get-game-state');
-          handleGameStart({
-            startTime: response.game.startTime,
-            segments: response.game.segments,
-            currentSegment: response.game.currentSegment,
-            config: response.game.config
-          });
+
+        if (response.success) {
+          if (response.game.status === 'playing') {
+            console.log('🎮 Game already playing, calling handleGameStart from get-game-state');
+            handleGameStart({
+              startTime: response.game.startTime,
+              segments: response.game.segments,
+              currentSegment: response.game.currentSegment,
+              config: response.game.config
+            });
+          } else if (response.game.status === 'countdown' && response.game.countdown !== undefined) {
+            console.log('⏱️ Game in countdown, showing countdown:', response.game.countdown);
+            setCountdown(response.game.countdown);
+          }
         }
       });
     };
