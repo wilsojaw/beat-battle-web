@@ -88,11 +88,6 @@ function WaitingContent() {
       console.log('⏱️ Countdown start:', data.countdown);
       setCountdown(data.countdown);
 
-      // Navigate to game page immediately when countdown starts
-      // This ensures students are already there before game-started event
-      console.log('🎮 Navigating to game page for countdown...');
-      router.push(`/student/game?code=${roomCode}`);
-
       // Pre-initialize Tone.js audio context during countdown to reduce lag
       try {
         const Tone = await import('tone');
@@ -106,18 +101,14 @@ function WaitingContent() {
     socket.on('countdown-tick', (data: { countdown: number }) => {
       console.log('⏱️ Countdown tick:', data.countdown);
       setCountdown(data.countdown);
-      // No longer navigate here - we navigate on countdown-start instead
     });
 
     socket.on('game-started', (data: any) => {
-      console.log('game-started event received in waiting room!', data);
-      // Students should already be on game page by now
-      // This is just a fallback in case they're still here
+      console.log('🎮 game-started event received in waiting room! Navigating to game page...');
       setCountdown(null);
       setStatus('Game starting!');
-      setTimeout(() => {
-        router.push(`/student/game?code=${roomCode}`);
-      }, 100);
+      // Navigate immediately when game starts
+      router.push(`/student/game?code=${roomCode}`);
     });
 
     socket.on('teacher-disconnected', () => {
