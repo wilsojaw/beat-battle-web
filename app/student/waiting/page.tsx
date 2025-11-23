@@ -85,17 +85,12 @@ function WaitingContent() {
     });
 
     socket.on('countdown-start', async (data: { countdown: number }) => {
-      console.log('⏱️ Countdown start:', data.countdown);
+      console.log('⏱️ Countdown start, navigating to game page');
       setCountdown(data.countdown);
+      setStatus('Game starting!');
 
-      // Pre-initialize Tone.js audio context during countdown to reduce lag
-      try {
-        const Tone = await import('tone');
-        await Tone.start();
-        console.log('🔊 Audio context primed during countdown');
-      } catch (e) {
-        console.log('Audio context initialization error:', e);
-      }
+      // Navigate immediately so students are on game page when game-started fires
+      router.push(`/student/game?code=${roomCode}`);
     });
 
     socket.on('countdown-tick', (data: { countdown: number }) => {
@@ -104,11 +99,7 @@ function WaitingContent() {
     });
 
     socket.on('game-started', (data: any) => {
-      console.log('🎮 game-started event received in waiting room! Navigating to game page...');
-      setCountdown(null);
-      setStatus('Game starting!');
-      // Navigate immediately when game starts
-      router.push(`/student/game?code=${roomCode}`);
+      console.log('🎮 game-started event received (should be on game page now)');
     });
 
     socket.on('teacher-disconnected', () => {
