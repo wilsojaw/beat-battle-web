@@ -6,6 +6,9 @@ const { Server } = require('socket.io');
 const dev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000', 10);
 
+console.log('🚀 Starting server...');
+console.log('Environment:', { dev, port, NODE_ENV: process.env.NODE_ENV });
+
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
@@ -930,12 +933,15 @@ app.prepare().then(() => {
     });
   });
 
+  console.log(`🎵 Attempting to bind HTTP server to 0.0.0.0:${port}...`);
+
   httpServer
     .once('error', (err) => {
-      console.error(err);
+      console.error('❌ Server error:', err);
       process.exit(1);
     })
     .listen(port, '0.0.0.0', () => {
-      console.log(`> Ready on http://0.0.0.0:${port}`);
+      console.log(`✅ Server ready on http://0.0.0.0:${port}`);
+      console.log(`📡 Socket.IO initialized and ready for connections`);
     });
 });
