@@ -1,128 +1,21 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
+import { useStudentStore } from '@/store/studentStore';
+import type { GameConfig } from '@/types/game';
 
-// Store socket on window to persist across hot reloads and page navigations
-declare global {
-  interface Window {
-    studentSocket?: Socket;
-  }
-}
-
-let socket: Socket;
-
-function WaitingContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [roomCode, setRoomCode] = useState('');
-  const [playerName, setPlayerName] = useState('Player');
-
-  const [playerCount, setPlayerCount] = useState(1);
-  const [playerNames, setPlayerNames] = useState<string[]>([]);
-  const [gameConfig, setGameConfig] = useState<any>(null);
-  const [status, setStatus] = useState('Waiting for teacher to start...');
-  const [countdown, setCountdown] = useState<number | null>(null);
-
-  useEffect(() => {
-    // Get values from sessionStorage on client side only
-    const code = searchParams.get('code') || (typeof window !== 'undefined' ? sessionStorage.getItem('roomCode') : '') || '';
-    const name = (typeof window !== 'undefined' ? sessionStorage.getItem('playerName') : '') || 'Player';
-
-    setRoomCode(code);
-    setPlayerName(name);
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (!roomCode) {
-      return;
-    }
-
-    // Reuse existing socket from window or create new one
-    if (typeof window !== 'undefined' && window.studentSocket) {
-      socket = window.studentSocket;
-    } else if (!socket) {
-      socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
-      if (typeof window !== 'undefined') {
-        window.studentSocket = socket;
-      }
-    }
-
-    console.log('Student waiting page - socket connected:', socket.connected, 'socket id:', socket.id);
-
-    // Make sure we're in the room to receive game-started event
-    if (socket.connected) {
-      socket.emit('student-rejoin', { roomCode, playerName });
-    }
-
-    socket.on('connect', () => {
-      console.log('Student socket connected in waiting room');
-      socket.emit('student-rejoin', { roomCode, playerName });
-    });
-
-    socket.on('player-count-update', (data: { totalPlayers: number }) => {
-      console.log('Player count update:', data);
-      setPlayerCount(data.totalPlayers);
-    });
-
-    socket.on('player-joined', (data: { totalPlayers: number; playerNames?: string[]; config?: any }) => {
-      console.log('Player joined event in waiting room:', data);
-      setPlayerCount(data.totalPlayers);
-      if (data.playerNames) {
-        setPlayerNames(data.playerNames);
-      }
-      if (data.config) {
-        setGameConfig(data.config);
-      }
-    });
-
-    socket.on('player-left', (data: { totalPlayers: number; playerNames?: string[] }) => {
-      setPlayerCount(data.totalPlayers);
-      if (data.playerNames) {
-        setPlayerNames(data.playerNames);
-      }
-    });
-
-    socket.on('countdown-start', async (data: { countdown: number }) => {
-      console.log('⏱️ Countdown start, navigating to game page');
-      setCountdown(data.countdown);
-      setStatus('Game starting!');
-
-      // Navigate immediately so students are on game page when game-started fires
-      router.push(`/student/game?code=${roomCode}`);
-    });
-
-    socket.on('countdown-tick', (data: { countdown: number }) => {
-      console.log('⏱️ Countdown tick:', data.countdown);
-      setCountdown(data.countdown);
-    });
-
-    socket.on('game-started', (data: any) => {
-      console.log('🎮 game-started event received (should be on game page now)');
-    });
-
-    socket.on('teacher-disconnected', () => {
-      alert('Teacher disconnected. Returning to join screen.');
-      router.push('/student/join');
-    });
-
-    return () => {
-      // Don't disconnect socket - we need it for the game page
-    };
-  }, [roomCode, playerName, router]);
-
-  if (countdown !== null) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center">
-        <div className="text-center text-white">
-          <div className="text-[300px] font-bold leading-none">
-            {countdown === 0 ? 'GO!' : countdown}
-          </div>
-        </div>
-      </div>
-    );
-  }
+/**
+ * LobbyView - Waiting room for students (replaces /student/waiting)
+ *
+ * Pure presentational component - reads state from Zustand store
+ */
+export function LobbyView() {
+  const {
+    roomCode,
+    playerName,
+    playerCount,
+    playerNames,
+    gameConfig,
+  } = useStudentStore();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center px-4">
@@ -132,7 +25,7 @@ function WaitingContent() {
           <h1 className="text-4xl font-bold text-purple-600 mb-2">
             Welcome, {playerName}!
           </h1>
-          <p className="text-xl text-gray-600 mb-8">{status}</p>
+          <p className="text-xl text-gray-600 mb-8">Waiting for teacher to start...</p>
 
           {/* Room Code */}
           <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-6 mb-8">
@@ -222,13 +115,5 @@ function WaitingContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function StudentWaiting() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-      <WaitingContent />
-    </Suspense>
   );
 }

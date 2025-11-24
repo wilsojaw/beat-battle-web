@@ -1,24 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
+import { socket } from '@/lib/socket';
+import { useStudentStore } from '@/store/studentStore';
+import { useSocketStore } from '@/store/socketStore';
 
-// Store socket on window to persist across hot reloads and page navigations
-declare global {
-  interface Window {
-    studentSocket?: Socket;
-  }
-}
-
-let socket: Socket;
-
-export default function StudentJoin() {
-  const router = useRouter();
+/**
+ * JoiningView - Student join form (replaces /student/join)
+ *
+ * Pure presentational component - no socket listeners, just emits join event
+ */
+export function JoiningView() {
   const [playerName, setPlayerName] = useState('Student');
   const [roomCode, setRoomCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const { setView, joinRoom } = useStudentStore();
+  const { connected } = useSocketStore();
 
   const joinGame = async () => {
     if (!playerName.trim()) {
@@ -31,98 +30,66 @@ export default function StudentJoin() {
       return;
     }
 
+    if (!connected) {
+      setError('Not connected to server. Please wait...');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      // Connect to Socket.io server - reuse existing socket if available
-      if (typeof window !== 'undefined' && window.studentSocket && window.studentSocket.connected) {
-        console.log('♻️ Reusing existing student socket');
-        socket = window.studentSocket;
-      } else {
-        console.log('🆕 Creating new student socket');
-        socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
-        if (typeof window !== 'undefined') {
-          window.studentSocket = socket;
-        }
+      // Perform clock synchronization
+      console.log('🕐 Starting clock synchronization...');
+      const offsets: number[] = [];
 
-        // Only set up connect listener for NEW sockets
-        socket.once('connect', () => {
-          console.log('Student connected to Socket.io:', socket.id);
+      for (let i = 0; i < 5; i++) {
+        const clientSendTime = Date.now();
 
-          // Perform clock synchronization in background (non-blocking)
-          (async () => {
-            console.log('🕐 Starting clock synchronization...');
-            const offsets: number[] = [];
-
-            for (let i = 0; i < 5; i++) {
-              const clientSendTime = Date.now();
-
-              await new Promise<void>((resolve) => {
-                socket.emit('time-sync', { clientTime: clientSendTime }, (response: any) => {
-                  const clientReceiveTime = Date.now();
-                  const roundTripTime = clientReceiveTime - clientSendTime;
-                  const serverTime = response.serverTime;
-
-                  // Calculate offset: server time - estimated client time when server responded
-                  const estimatedClientTimeAtServer = clientSendTime + (roundTripTime / 2);
-                  const offset = serverTime - estimatedClientTimeAtServer;
-
-                  offsets.push(offset);
-                  console.log(`Ping ${i + 1}: RTT=${roundTripTime}ms, Offset=${offset}ms`);
-                  resolve();
-                });
-              });
-
-              // Small delay between pings
-              if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
-            }
-
-            // Calculate median offset (ignore outliers)
-            offsets.sort((a, b) => a - b);
-            const medianOffset = offsets[Math.floor(offsets.length / 2)];
-
-            console.log(`✅ Clock sync complete! Median offset: ${medianOffset}ms`);
-
-            // Store the time offset
-            sessionStorage.setItem('timeOffset', medianOffset.toString());
-          })(); // Run in background, don't await
-        });
-      }
-
-      // Wait for connection if not already connected
-      if (!socket.connected) {
-        console.log('⏳ Waiting for socket to connect...');
         await new Promise<void>((resolve) => {
-          socket.once('connect', () => {
-            console.log('✅ Socket connected!');
+          socket.emit('time-sync', { clientTime: clientSendTime }, (response: any) => {
+            const clientReceiveTime = Date.now();
+            const roundTripTime = clientReceiveTime - clientSendTime;
+            const serverTime = response.serverTime;
+
+            // Calculate offset: server time - estimated client time when server responded
+            const estimatedClientTimeAtServer = clientSendTime + (roundTripTime / 2);
+            const offset = serverTime - estimatedClientTimeAtServer;
+
+            offsets.push(offset);
+            console.log(`Ping ${i + 1}: RTT=${roundTripTime}ms, Offset=${offset}ms`);
             resolve();
           });
         });
+
+        // Small delay between pings
+        if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
       }
 
+      // Calculate median offset (ignore outliers)
+      offsets.sort((a, b) => a - b);
+      const medianOffset = offsets[Math.floor(offsets.length / 2)];
+
+      console.log(`✅ Clock sync complete! Median offset: ${medianOffset}ms`);
+
+      // Store the time offset in Zustand store
+      useSocketStore.getState().setClockOffset(medianOffset);
+
+      // Join the game
       socket.emit('join-game', {
         roomCode: roomCode.trim().toUpperCase(),
         playerName: playerName.trim()
       }, (response: any) => {
         if (response.success) {
-          // Store player info
-          sessionStorage.setItem('roomCode', roomCode.trim().toUpperCase());
-          sessionStorage.setItem('playerName', playerName.trim());
-          sessionStorage.setItem('isTeacher', 'false');
+          // Store player info in Zustand store
+          joinRoom(roomCode.trim().toUpperCase(), playerName.trim());
 
-          // Navigate to waiting room
-          router.push(`/student/waiting?code=${roomCode.trim().toUpperCase()}`);
+          // Transition to lobby view
+          setView('lobby');
         } else {
           setError(response.error || 'Failed to join game. Please check the room code.');
           setLoading(false);
         }
-      });
-
-      // Handle connection errors
-      socket.on('connect_error', () => {
-        setError('Connection error. Please check your internet connection.');
-        setLoading(false);
       });
 
     } catch (err) {
@@ -134,6 +101,13 @@ export default function StudentJoin() {
   const handleRoomCodeChange = (value: string) => {
     // Auto-uppercase and limit to 6 characters
     setRoomCode(value.toUpperCase().slice(0, 6));
+  };
+
+  const goToHome = () => {
+    // Navigate to home by resetting to landing page
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -151,6 +125,12 @@ export default function StudentJoin() {
           </div>
         )}
 
+        {!connected && (
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg mb-6">
+            Connecting to server...
+          </div>
+        )}
+
         <div className="space-y-6">
           {/* Player Name */}
           <div>
@@ -165,6 +145,9 @@ export default function StudentJoin() {
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none text-lg text-gray-900 placeholder:text-gray-400"
               disabled={loading}
               maxLength={20}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') joinGame();
+              }}
             />
           </div>
 
@@ -181,6 +164,9 @@ export default function StudentJoin() {
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none text-2xl font-bold text-center tracking-widest uppercase text-gray-900 placeholder:text-gray-400"
               disabled={loading}
               maxLength={6}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') joinGame();
+              }}
             />
             <p className="text-sm text-gray-500 mt-2">
               Ask your teacher for the 6-character room code
@@ -192,14 +178,14 @@ export default function StudentJoin() {
         <div className="mt-8 space-y-4">
           <button
             onClick={joinGame}
-            disabled={loading || !playerName.trim() || !roomCode.trim()}
+            disabled={loading || !playerName.trim() || !roomCode.trim() || !connected}
             className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg text-lg"
           >
             {loading ? 'Joining...' : 'Join Game! 🎮'}
           </button>
 
           <button
-            onClick={() => router.push('/')}
+            onClick={goToHome}
             disabled={loading}
             className="w-full px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
           >
