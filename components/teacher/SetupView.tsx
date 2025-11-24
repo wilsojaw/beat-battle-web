@@ -1,17 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
+import { socket } from '@/lib/socket';
+import { useTeacherStore } from '@/store/teacherStore';
 import type { GameConfig, NoteValue } from '@/types/game';
 import { NOTE_VALUES } from '@/types/game';
 import { TemplatePickerModal } from '@/components/TemplatePickerModal';
 import type { GameTemplate } from '@/lib/game-templates';
 
-let socket: Socket;
+/**
+ * SetupView - Teacher game configuration (replaces /teacher/setup)
+ *
+ * Pure presentational component - no socket listeners, just emits create-game
+ */
+export function SetupView() {
+  const { setView, createRoom, setGameConfig } = useTeacherStore();
 
-export default function TeacherSetup() {
-  const router = useRouter();
   const [teacherName, setTeacherName] = useState('Teacher');
   const [tempo, setTempo] = useState(100);
   const [selectedNotes, setSelectedNotes] = useState<NoteValue[]>(['quarter', 'eighth', 'half']);
@@ -60,9 +64,6 @@ export default function TeacherSetup() {
     setError('');
 
     try {
-      // Connect to Socket.io server
-      socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
-
       const config: GameConfig = {
         tempo,
         noteValues: selectedNotes,
@@ -77,13 +78,12 @@ export default function TeacherSetup() {
 
       socket.emit('create-game', { teacherName: teacherName.trim(), config }, (response: any) => {
         if (response.success) {
-          // Store game state in sessionStorage
-          sessionStorage.setItem('roomCode', response.roomCode);
-          sessionStorage.setItem('teacherName', teacherName.trim());
-          sessionStorage.setItem('isTeacher', 'true');
+          // Store in Zustand store
+          createRoom(response.roomCode, teacherName.trim());
+          setGameConfig(config);
 
-          // Navigate to lobby
-          router.push(`/teacher/lobby?code=${response.roomCode}`);
+          // Transition to lobby view
+          setView('lobby');
         } else {
           setError('Failed to create game. Please try again.');
           setLoading(false);
@@ -92,6 +92,12 @@ export default function TeacherSetup() {
     } catch (err) {
       setError('Connection error. Please check your internet connection.');
       setLoading(false);
+    }
+  };
+
+  const goToHome = () => {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
     }
   };
 
@@ -307,7 +313,7 @@ export default function TeacherSetup() {
           {/* Action Buttons */}
           <div className="mt-8 flex gap-4">
             <button
-              onClick={() => router.push('/')}
+              onClick={goToHome}
               disabled={loading}
               className="flex-1 px-6 py-4 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors disabled:opacity-50"
             >

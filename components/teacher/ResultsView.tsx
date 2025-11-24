@@ -1,65 +1,74 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
+import { useMemo } from 'react';
+import { useTeacherStore } from '@/store/teacherStore';
 import type { GameResult, NoteValue } from '@/types/game';
 import { NOTE_VALUES } from '@/types/game';
 
-let socket: Socket;
+/**
+ * ResultsView - Teacher results dashboard (replaces /teacher/results)
+ *
+ * Shows class statistics, podium, and full leaderboard
+ */
+export function ResultsView() {
+  const { results, setView, reset } = useTeacherStore();
 
-function ResultsContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const roomCode = searchParams.get('code') || sessionStorage.getItem('roomCode') || '';
-
-  const [results, setResults] = useState<GameResult[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!roomCode) {
-      router.push('/teacher/setup');
-      return;
+  // Calculate class statistics
+  const classStats = useMemo(() => {
+    if (!results || results.length === 0) {
+      return {
+        averageAccuracy: 0,
+        totalPlayers: 0,
+        mostStruggledNote: 'quarter' as NoteValue,
+        topPerformers: []
+      };
     }
 
-    // Reuse existing socket (should already be connected from game page)
-    if (!socket) {
-      socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
-    }
+    const averageAccuracy = Math.round(
+      results.reduce((sum, r) => sum + r.overallAccuracy, 0) / results.length
+    );
 
-    // Set up listener first before rejoining
-    const handleGameEnded = (data: { results: GameResult[] }) => {
-      setResults(data.results);
-      setLoading(false);
+    // Find most struggled note (note that appears most as worst note)
+    const noteAccuracies = new Map<NoteValue, number[]>();
+    results.forEach(result => {
+      if (!noteAccuracies.has(result.worstNoteType)) {
+        noteAccuracies.set(result.worstNoteType, []);
+      }
+      noteAccuracies.get(result.worstNoteType)!.push(result.overallAccuracy);
+    });
+
+    let mostStruggledNote: NoteValue = 'quarter';
+    let lowestCount = 0;
+    noteAccuracies.forEach((accuracies, note) => {
+      if (accuracies.length > lowestCount) {
+        lowestCount = accuracies.length;
+        mostStruggledNote = note;
+      }
+    });
+
+    const topPerformers = results.slice(0, 3);
+
+    return {
+      averageAccuracy,
+      totalPlayers: results.length,
+      mostStruggledNote,
+      topPerformers
     };
-
-    socket.on('game-ended', handleGameEnded);
-
-    // If socket isn't connected yet, wait for connection
-    if (!socket.connected) {
-      socket.on('connect', () => {
-        socket.emit('teacher-rejoin', { roomCode });
-      });
-    } else {
-      // Rejoin the room to receive events
-      socket.emit('teacher-rejoin', { roomCode });
-    }
-
-    return () => {
-      socket.off('game-ended', handleGameEnded);
-      // Don't disconnect socket - we might need it
-    };
-  }, [roomCode, router]);
+  }, [results]);
 
   const playAgain = () => {
-    router.push('/teacher/setup');
+    reset();
+    setView('setup');
   };
 
   const exit = () => {
-    router.push('/');
+    reset();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
-  if (loading) {
+  if (!results || results.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 flex items-center justify-center">
         <div className="text-center text-white">
@@ -69,31 +78,6 @@ function ResultsContent() {
       </div>
     );
   }
-
-  // Calculate class statistics
-  const averageAccuracy = results.length > 0
-    ? Math.round(results.reduce((sum, r) => sum + r.overallAccuracy, 0) / results.length)
-    : 0;
-
-  // Find most struggled note
-  const noteAccuracies = new Map<NoteValue, number[]>();
-  results.forEach(result => {
-    if (!noteAccuracies.has(result.worstNoteType)) {
-      noteAccuracies.set(result.worstNoteType, []);
-    }
-    noteAccuracies.get(result.worstNoteType)!.push(result.overallAccuracy);
-  });
-
-  let mostStruggledNote: NoteValue = 'quarter';
-  let lowestCount = 0;
-  noteAccuracies.forEach((accuracies, note) => {
-    if (accuracies.length > lowestCount) {
-      lowestCount = accuracies.length;
-      mostStruggledNote = note;
-    }
-  });
-
-  const topPerformers = results.slice(0, 3);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 py-8 px-4">
@@ -110,7 +94,7 @@ function ResultsContent() {
             {/* Average Accuracy */}
             <div className="bg-gradient-to-r from-green-100 to-blue-100 rounded-xl p-6">
               <div className="text-center">
-                <div className="text-5xl font-bold text-gray-700 mb-2">{averageAccuracy}%</div>
+                <div className="text-5xl font-bold text-gray-700 mb-2">{classStats.averageAccuracy}%</div>
                 <div className="text-sm text-gray-600">Class Average</div>
               </div>
             </div>
@@ -118,7 +102,7 @@ function ResultsContent() {
             {/* Total Players */}
             <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-6">
               <div className="text-center">
-                <div className="text-5xl font-bold text-gray-700 mb-2">{results.length}</div>
+                <div className="text-5xl font-bold text-gray-700 mb-2">{classStats.totalPlayers}</div>
                 <div className="text-sm text-gray-600">Total Players</div>
               </div>
             </div>
@@ -126,30 +110,30 @@ function ResultsContent() {
             {/* Most Struggled */}
             <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-xl p-6">
               <div className="text-center">
-                <div className="text-5xl mb-2">{NOTE_VALUES[mostStruggledNote].symbol}</div>
+                <div className="text-5xl mb-2">{NOTE_VALUES[classStats.mostStruggledNote].symbol}</div>
                 <div className="text-sm text-gray-600">Most Struggled Note</div>
                 <div className="text-xs text-gray-500 mt-1">
-                  {NOTE_VALUES[mostStruggledNote].displayName}
+                  {NOTE_VALUES[classStats.mostStruggledNote].displayName}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Podium */}
-          {topPerformers.length > 0 && (
+          {classStats.topPerformers.length > 0 && (
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-gray-700 mb-4">🏆 Top Performers</h2>
               <div className="flex justify-center items-end gap-4 mb-6">
                 {/* 2nd Place */}
-                {topPerformers[1] && (
+                {classStats.topPerformers[1] && (
                   <div className="flex-1 max-w-xs">
                     <div className="bg-gradient-to-b from-gray-300 to-gray-400 rounded-t-xl p-6 text-center">
                       <div className="text-5xl mb-2">🥈</div>
                       <div className="text-xl font-bold text-white mb-1">
-                        {topPerformers[1].player.name}
+                        {classStats.topPerformers[1].player.name}
                       </div>
                       <div className="text-3xl font-bold text-white">
-                        {topPerformers[1].overallAccuracy}%
+                        {classStats.topPerformers[1].overallAccuracy}%
                       </div>
                     </div>
                     <div className="bg-gray-400 h-24 rounded-b-xl flex items-center justify-center">
@@ -159,15 +143,15 @@ function ResultsContent() {
                 )}
 
                 {/* 1st Place */}
-                {topPerformers[0] && (
+                {classStats.topPerformers[0] && (
                   <div className="flex-1 max-w-xs">
                     <div className="bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-t-xl p-6 text-center">
                       <div className="text-6xl mb-2">🥇</div>
                       <div className="text-xl font-bold text-white mb-1">
-                        {topPerformers[0].player.name}
+                        {classStats.topPerformers[0].player.name}
                       </div>
                       <div className="text-4xl font-bold text-white">
-                        {topPerformers[0].overallAccuracy}%
+                        {classStats.topPerformers[0].overallAccuracy}%
                       </div>
                     </div>
                     <div className="bg-yellow-500 h-32 rounded-b-xl flex items-center justify-center">
@@ -177,15 +161,15 @@ function ResultsContent() {
                 )}
 
                 {/* 3rd Place */}
-                {topPerformers[2] && (
+                {classStats.topPerformers[2] && (
                   <div className="flex-1 max-w-xs">
                     <div className="bg-gradient-to-b from-orange-300 to-orange-500 rounded-t-xl p-6 text-center">
                       <div className="text-4xl mb-2">🥉</div>
                       <div className="text-xl font-bold text-white mb-1">
-                        {topPerformers[2].player.name}
+                        {classStats.topPerformers[2].player.name}
                       </div>
                       <div className="text-2xl font-bold text-white">
-                        {topPerformers[2].overallAccuracy}%
+                        {classStats.topPerformers[2].overallAccuracy}%
                       </div>
                     </div>
                     <div className="bg-orange-500 h-16 rounded-b-xl flex items-center justify-center">
@@ -201,7 +185,7 @@ function ResultsContent() {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-700 mb-4">📊 Full Leaderboard</h2>
             <div className="space-y-3">
-              {results.map((result, index) => (
+              {results.map((result: GameResult, index: number) => (
                 <div
                   key={result.player.id}
                   className={`flex items-center justify-between p-4 rounded-lg ${
@@ -257,13 +241,5 @@ function ResultsContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function TeacherResults() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-      <ResultsContent />
-    </Suspense>
   );
 }

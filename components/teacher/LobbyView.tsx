@@ -1,71 +1,32 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
-import type { Player } from '@/types/game';
+import { useState, useEffect } from 'react';
+import { socket } from '@/lib/socket';
+import { useTeacherStore } from '@/store/teacherStore';
 
-let socket: Socket;
+/**
+ * LobbyView - Teacher lobby with player list (replaces /teacher/lobby)
+ *
+ * Pure presentational component - reads state from Zustand store
+ */
+export function LobbyView() {
+  const { roomCode, players, setView } = useTeacherStore();
 
-function LobbyContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const roomCode = searchParams.get('code') || sessionStorage.getItem('roomCode') || '';
-
-  const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [joinUrl, setJoinUrl] = useState('localhost:3000');
+  const [joinUrl, setJoinUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [allPlayersReady, setAllPlayersReady] = useState(false);
 
   useEffect(() => {
-    if (!roomCode) {
-      router.push('/teacher/setup');
-      return;
+    // Set join URL after mount to avoid hydration issues
+    if (typeof window !== 'undefined') {
+      setJoinUrl(window.location.origin);
     }
 
-    // Set join URL after mount to avoid hydration issues
-    setJoinUrl(window.location.origin);
-
-    // Connect to Socket.io
-    socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || '');
-
-    socket.on('connect', () => {
-      console.log('Teacher connected to Socket.io:', socket.id);
-      // Teacher needs to join the room to receive player-joined events
-      socket.emit('teacher-rejoin', { roomCode });
-    });
-
-    socket.on('player-joined', (data: { player: Player; totalPlayers: number }) => {
-      console.log('Player joined:', data);
-
-      setPlayers(prev => {
-        // Avoid duplicates
-        if (prev.find(p => p.id === data.player.id)) {
-          return prev;
-        }
-        return [...prev, data.player];
-      });
-    });
-
-    socket.on('player-left', (data: { player: Player; totalPlayers: number }) => {
-      setPlayers(prev => prev.filter(p => p.id !== data.player.id));
-    });
-
-    socket.on('player-connection-status', (data: { playerName: string; connected: boolean; allPlayersReady: boolean }) => {
-      console.log('Player connection status update:', data);
-      setPlayers(prev => prev.map(p =>
-        p.name === data.playerName ? { ...p, connected: data.connected } : p
-      ));
-      setAllPlayersReady(data.allPlayersReady);
-    });
-
-    return () => {
-      // Don't disconnect socket - we need it for the game page
-      socket.off('player-connection-status');
-    };
-  }, [roomCode, router]);
+    // Check if all players are ready
+    setAllPlayersReady(players.every(p => p.connected !== false));
+  }, [players]);
 
   const startGame = () => {
     if (players.length === 0) {
@@ -79,11 +40,14 @@ function LobbyContent() {
     }
 
     setLoading(true);
+    setError('');
+
     socket.emit('start-game', { roomCode }, (response: any) => {
       if (response.success) {
-        // Navigate after a small delay to ensure event is broadcast
+        // View will auto-transition when game-started event fires from SocketManager
+        // Just wait a moment to ensure everything is synced
         setTimeout(() => {
-          router.push(`/teacher/game?code=${roomCode}`);
+          setLoading(false);
         }, 100);
       } else {
         setError('Failed to start game. Please try again.');
@@ -93,15 +57,15 @@ function LobbyContent() {
   };
 
   const cancelGame = () => {
-    if (socket) {
-      socket.disconnect();
+    if (typeof window !== 'undefined') {
+      useTeacherStore.getState().reset();
+      window.location.href = '/';
     }
-    router.push('/');
   };
 
   const copyCode = async () => {
     try {
-      await navigator.clipboard.writeText(roomCode);
+      await navigator.clipboard.writeText(roomCode || '');
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -129,7 +93,7 @@ function LobbyContent() {
                 Students, join at:
               </p>
               <p className="text-2xl font-bold text-purple-600 mb-3">
-                {joinUrl}/student/join
+                {joinUrl}/student
               </p>
               <div className="bg-white rounded-lg py-6 px-8 inline-block shadow-lg relative">
                 <p className="text-sm text-gray-600 mb-1">Room Code:</p>
@@ -194,7 +158,7 @@ function LobbyContent() {
                         Player {index + 1}
                       </div>
                       <div className="mt-2">
-                        {player.connected ? (
+                        {player.connected !== false ? (
                           <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
                             <span className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></span>
                             Ready
@@ -234,13 +198,5 @@ function LobbyContent() {
         </div>
       </div>
     </div>
-  );
-}
-
-export default function TeacherLobby() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-      <LobbyContent />
-    </Suspense>
   );
 }
