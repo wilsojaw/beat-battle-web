@@ -47,21 +47,24 @@ export function useStudentGame() {
   // Initialize rhythm engine when game starts
   useEffect(() => {
     if (!gameData) return;
+    if (rhythmEngineRef.current) return; // Prevent double initialization
 
     const initGame = async () => {
       console.log('[useStudentGame] Initializing rhythm engine with tempo:', gameData.config.tempo);
 
       // Initialize rhythm engine
       rhythmEngineRef.current = new RhythmEngine(gameData.config.tempo);
+
+      // Try to initialize Tone.js, but don't block if it fails (students don't need audio)
       try {
         await rhythmEngineRef.current.init();
-        console.log('[useStudentGame] Rhythm engine initialized');
+        rhythmEngineRef.current.start();
+        console.log('[useStudentGame] Rhythm engine initialized successfully');
       } catch (e) {
-        console.log('[useStudentGame] Audio context already started');
+        console.error('[useStudentGame] Failed to initialize rhythm engine (audio unavailable, timing still works):', e);
       }
 
-      // Start the rhythm engine
-      rhythmEngineRef.current.start();
+      // Start the game UI regardless of audio state
       setIsPlaying(true);
 
       // Update current measure in real-time
@@ -72,10 +75,28 @@ export function useStudentGame() {
       const countInDuration = measureDuration; // 1 measure count-in
 
       measureIntervalRef.current = setInterval(() => {
-        const elapsed = getSyncedTime() - gameData.startTime;
+        const syncedTime = getSyncedTime();
+        const elapsed = syncedTime - gameData.startTime;
+
+        // Debug logging for Safari measure issue
+        if (elapsed > 1000000) {
+          console.error('[useStudentGame] Invalid elapsed time:', {
+            syncedTime,
+            startTime: gameData.startTime,
+            elapsed,
+            clockOffset
+          });
+        }
 
         // Account for count-in: measure 0 during count-in, then 1-based
-        const currentMeasureNum = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
+        let currentMeasureNum: number;
+        if (elapsed < countInDuration) {
+          // During count-in, keep measure at 0
+          currentMeasureNum = 0;
+        } else {
+          // After count-in, calculate actual measure number (1-based)
+          currentMeasureNum = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
+        }
 
         setCurrentMeasure(currentMeasureNum);
 
@@ -91,6 +112,9 @@ export function useStudentGame() {
           tapsInCurrentSegmentRef.current = 0;
 
           console.log(`[useStudentGame] Segment changed: ${previousSegmentRef.current?.noteValue} -> ${currentSeg.noteValue}`);
+
+          // Update Zustand store so UI reflects the change
+          useStudentStore.getState().setCurrentSegment(currentSeg);
 
           // Find next segment
           const currentIndex = gameData.segments.findIndex(s =>

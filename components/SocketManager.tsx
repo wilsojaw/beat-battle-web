@@ -87,14 +87,21 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
 
     // ==================== Student Event Handlers ====================
 
-    function onPlayerJoined(data: { totalPlayers: number; playerNames?: string[]; config?: any }) {
-      console.log('[Student] Player joined:', data);
+    function onPlayerJoined(data: { player?: any; totalPlayers: number; playerNames?: string[]; config?: any }) {
+      console.log('[Socket] Player joined:', data);
+
+      // Update student store
       useStudentStore.getState().setPlayerCount(data.totalPlayers);
       if (data.playerNames) {
         useStudentStore.getState().setPlayerNames(data.playerNames);
       }
       if (data.config) {
         useStudentStore.getState().setGameConfig(data.config);
+      }
+
+      // Update teacher store
+      if (data.player) {
+        useTeacherStore.getState().addPlayer(data.player);
       }
     }
 
@@ -111,18 +118,24 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       useStudentStore.getState().setPlayerCount(data.totalPlayers);
     }
 
-    function onCountdownStart(data: { countdown: number }, callback?: Function) {
-      console.log('[Student] Countdown start:', data.countdown);
+    function onCountdownStart(data: { countdown: number }) {
+      console.log('[Socket] Countdown start:', data.countdown);
+
+      // Update student store
       useStudentStore.getState().setView('countdown');
       useStudentStore.getState().setCountdown(data.countdown);
 
-      // Acknowledge receipt (if callback provided for ACK-based events)
-      if (callback) callback('received');
+      // Update teacher store
+      useTeacherStore.getState().setView('playing');
+      useTeacherStore.getState().setCountdown(data.countdown);
     }
 
     function onCountdownTick(data: { countdown: number }) {
-      console.log('[Student] Countdown tick:', data.countdown);
+      console.log('[Socket] Countdown tick:', data.countdown);
+
+      // Update both stores
       useStudentStore.getState().setCountdown(data.countdown);
+      useTeacherStore.getState().setCountdown(data.countdown);
     }
 
     function onGameStarted(data: {
@@ -130,9 +143,10 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       segments: GameSegment[];
       currentSegment: GameSegment;
       config: any;
-    }, callback?: Function) {
-      console.log('[Student] Game started:', data);
+    }) {
+      console.log('[Socket] Game started:', data);
 
+      // Update student store
       useStudentStore.getState().setGameData({
         startTime: data.startTime,
         segments: data.segments,
@@ -141,7 +155,7 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       useStudentStore.getState().setCurrentSegment(data.currentSegment);
       useStudentStore.getState().setCountdown(null);
 
-      // Find next segment
+      // Find next segment for student
       const currentIndex = data.segments.findIndex(s =>
         s.noteValue === data.currentSegment.noteValue &&
         s.startTime === data.currentSegment.startTime
@@ -150,8 +164,19 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
         useStudentStore.getState().setNextSegment(data.segments[currentIndex + 1]);
       }
 
-      // Acknowledge receipt (if callback provided for ACK-based events)
-      if (callback) callback('received');
+      // Transition student to playing view
+      useStudentStore.getState().setView('playing');
+
+      // Update teacher store
+      useTeacherStore.getState().setGameData({
+        startTime: data.startTime,
+        segments: data.segments,
+        config: data.config,
+      });
+      useTeacherStore.getState().setCurrentSegment(data.currentSegment);
+      useTeacherStore.getState().setCountdown(null);
+
+      // Teacher is already in playing view from countdown-start
     }
 
     function onSegmentChanged(data: { segment: GameSegment }) {
@@ -171,12 +196,16 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       }
     }
 
-    function onGameEnded(data: any, callback?: Function) {
-      console.log('[Student] Game ended:', data);
-      useStudentStore.getState().setResults(data);
+    function onGameEnded(data: any) {
+      console.log('[Socket] Game ended:', data);
 
-      // Acknowledge receipt (if callback provided for ACK-based events)
-      if (callback) callback('received');
+      // Update student store
+      useStudentStore.getState().setResults(data);
+      useStudentStore.getState().setView('finished');
+
+      // Update teacher store
+      useTeacherStore.getState().setResults(data.results || []);
+      useTeacherStore.getState().setView('finished');
     }
 
     function onMilestoneAchieved(milestone: MilestoneEvent) {
@@ -285,10 +314,16 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       useTeacherStore.getState().setResults(data.results);
     }
 
-    function onPlayerTap(data: { playerId: string; tap: any }) {
+    function onPlayerTap(data: { playerId: string; playerName: string; tap: any }) {
       // Teacher receives tap events for monitoring
-      console.log('[Teacher] Player tap:', data.playerId);
-      // Could store in teacher store for live monitoring dashboard
+      console.log('[Teacher] Player tap:', data.playerName);
+
+      // Update player's tap count in teacher store
+      const player = useTeacherStore.getState().players.find(p => p.id === data.playerId);
+      if (player) {
+        const updatedTaps = [...(player.taps || []), data.tap];
+        useTeacherStore.getState().updatePlayer(data.playerId, { taps: updatedTaps });
+      }
     }
 
     function onGetGameStateTeacher(response: any) {

@@ -101,6 +101,21 @@ export function SetupView() {
     }
   };
 
+  // Calculate total game duration based on measures, tempo, and time signature
+  // This makes it easy to support different time signatures in the future
+  const calculateGameDuration = (measures: number, bpm: number, beatsPerMeasure: number = 4) => {
+    const secondsPerBeat = 60 / bpm;
+    const secondsPerMeasure = secondsPerBeat * beatsPerMeasure;
+    const totalSeconds = secondsPerMeasure * measures;
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+
+    return { totalSeconds, minutes, seconds };
+  };
+
+  const gameDuration = calculateGameDuration(totalMeasures, tempo);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -205,6 +220,21 @@ export function SetupView() {
               <div className="flex justify-between text-sm text-gray-600 mt-1">
                 <span>4 measures</span>
                 <span>32 measures</span>
+              </div>
+              {/* Game Duration Display */}
+              <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-2 border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm text-gray-600 mb-1">Game Duration (4/4 time)</div>
+                    <div className="text-3xl font-bold text-purple-600">
+                      {gameDuration.minutes}:{gameDuration.seconds.toString().padStart(2, '0')}
+                    </div>
+                  </div>
+                  <div className="text-4xl">⏱️</div>
+                </div>
+                <div className="text-xs text-gray-500 mt-2">
+                  {totalMeasures} measures × {tempo} BPM = {Math.round(gameDuration.totalSeconds)} seconds
+                </div>
               </div>
             </div>
 

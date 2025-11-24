@@ -1,6 +1,7 @@
 'use client';
 
 import { useStudentStore } from '@/store/studentStore';
+import { socket } from '@/lib/socket';
 import type { GameConfig } from '@/types/game';
 
 /**
@@ -15,7 +16,19 @@ export function LobbyView() {
     playerCount,
     playerNames,
     gameConfig,
+    reset,
   } = useStudentStore();
+
+  const leaveGame = () => {
+    // Leave the socket room
+    socket.emit('leave-game', { roomCode });
+
+    // Reset store and go back home
+    reset();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center px-4">
@@ -111,6 +124,16 @@ export function LobbyView() {
             <div className="w-3 h-3 bg-purple-600 rounded-full animate-pulse"></div>
             <div className="w-3 h-3 bg-pink-600 rounded-full animate-pulse delay-100"></div>
             <div className="w-3 h-3 bg-blue-600 rounded-full animate-pulse delay-200"></div>
+          </div>
+
+          {/* Leave Game Button */}
+          <div className="mt-6">
+            <button
+              onClick={leaveGame}
+              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors text-sm"
+            >
+              Leave Game
+            </button>
           </div>
         </div>
       </div>
