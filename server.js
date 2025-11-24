@@ -301,12 +301,8 @@ function generateLeaderboardUpdate(game) {
 }
 
 function generateRoomCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
+  // Generate 4-digit numeric code (1000-9999)
+  return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
 function generateGameSegments(config) {
