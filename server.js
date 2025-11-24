@@ -502,11 +502,69 @@ app.prepare().then(() => {
     cors: {
       origin: dev ? 'http://localhost:3000' : process.env.NEXT_PUBLIC_APP_URL,
       methods: ['GET', 'POST']
-    }
+    },
+
+    // ==================== PRODUCTION HARDENING ====================
+
+    // Connection State Recovery (Socket.io v4.6+)
+    // Allows clients to recover their state after a temporary disconnect
+    connectionStateRecovery: {
+      // Maximum time a client can be disconnected and still recover
+      maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+      // Skip middlewares during recovery (faster reconnection)
+      skipMiddlewares: true,
+    },
+
+    // Performance Tuning
+    // Disable per-message deflate to prevent memory exhaustion at scale
+    perMessageDeflate: false,
+
+    // Heartbeat Configuration
+    // Increase ping timeout to handle mobile network switches
+    pingTimeout: 60000,           // 60 seconds (up from 20s default)
+    pingInterval: 25000,          // 25 seconds (default)
+
+    // Connection Limits
+    connectTimeout: 45000,        // 45 seconds connection timeout
+    maxHttpBufferSize: 1e6,       // 1MB max message size
+
+    // Transport Configuration
+    transports: ['websocket', 'polling'], // Try WebSocket first, fallback to polling
+
+    // Upgrade Timeout
+    upgradeTimeout: 10000,        // 10 seconds to upgrade from polling to WebSocket
+
+    // Allow Upgrades
+    allowUpgrades: true,          // Allow transport upgrades
   });
 
   io.on('connection', (socket) => {
     // Client connected
+    console.log(`[Socket.io] Client connected: ${socket.id} (transport: ${socket.conn.transport.name})`);
+
+    // Connection State Recovery - check if this is a recovered connection
+    if (socket.recovered) {
+      console.log(`[Socket.io] ✅ Connection recovered for: ${socket.id}`);
+    }
+
+    // Monitor transport upgrades (polling → websocket)
+    socket.conn.on('upgrade', (transport) => {
+      console.log(`[Socket.io] Transport upgraded to: ${transport.name} for ${socket.id}`);
+    });
+
+    // Monitor disconnect reasons
+    socket.on('disconnect', (reason) => {
+      console.log(`[Socket.io] Client disconnected: ${socket.id}, reason: ${reason}`);
+
+      // Log specific disconnect scenarios
+      if (reason === 'ping timeout') {
+        console.log(`[Socket.io] ⚠️  Ping timeout - client may have lost connection`);
+      } else if (reason === 'transport close') {
+        console.log(`[Socket.io] ⚠️  Transport closed - network issue likely`);
+      } else if (reason === 'client namespace disconnect') {
+        console.log(`[Socket.io] Client intentionally disconnected`);
+      }
+    });
 
     socket.on('teacher-rejoin', (data) => {
       const game = games.get(data.roomCode);
