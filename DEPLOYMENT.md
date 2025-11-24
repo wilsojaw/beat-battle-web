@@ -15,7 +15,7 @@ Set these in your hosting platform:
 ```bash
 # Required
 NODE_ENV=production
-PORT=3000
+PORT=8080
 
 # Optional (auto-detected if not set)
 NEXT_PUBLIC_APP_URL=https://your-domain.com
@@ -37,7 +37,7 @@ NEXT_PUBLIC_SOCKET_URL=https://your-domain.com
 2. **Configure Build Settings**
    - Build Command: `npm run build`
    - Start Command: `npm start`
-   - Port: `3000`
+   - Port: `8080` (Railway expects 8080, not 3000)
 
 3. **Deploy**
    ```bash
