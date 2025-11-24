@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SocketManager } from "@/components/SocketManager";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,10 +30,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SocketManager>
-          <ConnectionStatus />
-          {children}
-        </SocketManager>
+        <ErrorBoundary>
+          <SocketManager>
+            <ConnectionStatus />
+            {children}
+          </SocketManager>
+        </ErrorBoundary>
       </body>
     </html>
   );
