@@ -3,6 +3,7 @@ import { socket } from '@/lib/socket';
 import { useStudentStore } from '@/store/studentStore';
 import { useSocketStore } from '@/store/socketStore';
 import { RhythmEngine } from '@/lib/rhythm-engine';
+import { NOTE_VALUES } from '@/types/game';
 import type { TapEvent, GameSegment } from '@/types/game';
 
 /**
@@ -137,24 +138,25 @@ export function useStudentGame() {
       ? previousSegmentRef.current
       : currentSegmentRef.current;
 
+    // Calculate expected interval based on note value
+    const noteInfo = NOTE_VALUES[segmentForCalculation.noteValue];
+    const beatDuration = 60 / (gameData?.config.tempo || 120); // seconds per beat
+    const expectedInterval = (beatDuration / noteInfo.tapsPerBeat) * 1000; // ms between taps
+
     // Calculate accuracy using rhythm engine
-    const accuracy = rhythmEngineRef.current.calculateTapAccuracy(tapTime, segmentForCalculation.noteValue);
-
-    // Calculate interval between taps
-    const interval = previousTapTimeRef.current
-      ? tapTime - previousTapTimeRef.current
-      : 0;
-
-    // Get expected interval
-    const expectedInterval = rhythmEngineRef.current.getExpectedInterval(segmentForCalculation.noteValue);
+    const tapResult = rhythmEngineRef.current.calculateTapAccuracy(
+      tapTime,
+      previousTapTimeRef.current,
+      expectedInterval
+    );
 
     // Create tap event
     const tapEvent: TapEvent = {
       timestamp: tapTime,
       noteValue: currentSegmentRef.current.noteValue,
       expectedTime: 0, // Server will calculate this
-      accuracy: accuracy,
-      interval: interval,
+      accuracy: tapResult.accuracy,
+      interval: tapResult.interval,
       expectedInterval: expectedInterval,
     };
 
@@ -169,10 +171,10 @@ export function useStudentGame() {
     tapsInCurrentSegmentRef.current++;
 
     // Show feedback
-    if (interval > 0) {
-      if (Math.abs(accuracy) < 30) {
+    if (tapResult.interval > 0) {
+      if (Math.abs(tapResult.accuracy) < 30) {
         setFeedback('great');
-      } else if (Math.abs(accuracy) < 75) {
+      } else if (Math.abs(tapResult.accuracy) < 75) {
         setFeedback('good');
       } else {
         setFeedback('miss');

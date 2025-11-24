@@ -28,7 +28,7 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
     function onConnect() {
       console.log('[Socket] Connected:', socket.id);
       useSocketStore.getState().setConnected(true);
-      useSocketStore.getState().setSocketId(socket.id);
+      useSocketStore.getState().setSocketId(socket.id || null);
       useSocketStore.getState().setReconnecting(false);
       useSocketStore.getState().setError(null);
     }
@@ -355,7 +355,7 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
     } else {
       console.log('[SocketManager] Socket already connected');
       useSocketStore.getState().setConnected(true);
-      useSocketStore.getState().setSocketId(socket.id);
+      useSocketStore.getState().setSocketId(socket.id || null);
     }
 
     // ==================== Cleanup Function ====================

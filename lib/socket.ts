@@ -7,8 +7,8 @@ declare global {
   }
 }
 
-// Create singleton socket instance
-let socket: Socket;
+// Create singleton socket instance (will be initialized lazily)
+let socketInstance: Socket | null = null;
 
 export function getSocket(): Socket {
   if (typeof window === 'undefined') {
@@ -22,10 +22,10 @@ export function getSocket(): Socket {
   }
 
   // Create new socket connection
-  if (!socket || !socket.connected) {
+  if (!socketInstance || !socketInstance.connected) {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || '';
 
-    socket = io(socketUrl, {
+    socketInstance = io(socketUrl, {
       // Connection options
       autoConnect: true,
       reconnection: true,
@@ -39,39 +39,39 @@ export function getSocket(): Socket {
     });
 
     // Store on window for persistence
-    window.__beatBattleSocket = socket;
+    window.__beatBattleSocket = socketInstance;
 
     // Connection logging
-    socket.on('connect', () => {
-      console.log('[Socket] Connected:', socket.id);
+    socketInstance.on('connect', () => {
+      console.log('[Socket] Connected:', socketInstance?.id);
     });
 
-    socket.on('disconnect', (reason) => {
+    socketInstance.on('disconnect', (reason) => {
       console.log('[Socket] Disconnected:', reason);
     });
 
-    socket.on('connect_error', (error) => {
+    socketInstance.on('connect_error', (error) => {
       console.error('[Socket] Connection error:', error.message);
     });
 
-    socket.on('reconnect', (attemptNumber) => {
+    socketInstance.on('reconnect', (attemptNumber) => {
       console.log('[Socket] Reconnected after', attemptNumber, 'attempts');
     });
 
-    socket.on('reconnect_attempt', (attemptNumber) => {
+    socketInstance.on('reconnect_attempt', (attemptNumber) => {
       console.log('[Socket] Reconnection attempt', attemptNumber);
     });
 
-    socket.on('reconnect_error', (error) => {
+    socketInstance.on('reconnect_error', (error) => {
       console.error('[Socket] Reconnection error:', error.message);
     });
 
-    socket.on('reconnect_failed', () => {
+    socketInstance.on('reconnect_failed', () => {
       console.error('[Socket] Reconnection failed');
     });
   }
 
-  return socket;
+  return socketInstance;
 }
 
 // Export singleton socket instance
