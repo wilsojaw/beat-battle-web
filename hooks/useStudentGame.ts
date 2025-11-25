@@ -38,6 +38,7 @@ export function useStudentGame() {
   const currentSegmentRef = useRef<GameSegment | null>(null);
   const tapsInCurrentSegmentRef = useRef<number>(0);
   const measureIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const gameInitializedRef = useRef<boolean>(false); // Track if game has been initialized
 
   // Get synchronized server time
   const getSyncedTime = useCallback(() => {
@@ -55,78 +56,43 @@ export function useStudentGame() {
       // Initialize rhythm engine
       rhythmEngineRef.current = new RhythmEngine(gameData.config.tempo);
 
-      // Try to initialize Tone.js, but don't block if it fails (students don't need audio)
-      try {
+      // Skip audio initialization for Safari
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      if (!isSafari) {
         await rhythmEngineRef.current.init();
         rhythmEngineRef.current.start();
-        console.log('[useStudentGame] Rhythm engine initialized successfully');
-      } catch (e) {
-        console.error('[useStudentGame] Failed to initialize rhythm engine (audio unavailable, timing still works):', e);
+        setIsPlaying(true);
+      } else {
+        console.log('[useStudentGame] Rhythm engine instantiated (audio context skipped for Safari compatibility)');
       }
 
-      // Start the game UI regardless of audio state
-      setIsPlaying(true);
+      // Initialize segment refs from gameData
+      const initialSegment = gameData.segments[0];
+      if (initialSegment) {
+        console.log('[useStudentGame] Initializing with first segment:', initialSegment.noteValue);
+        currentSegmentRef.current = initialSegment;
+        previousSegmentRef.current = initialSegment;
+      }
 
-      // Update current measure in real-time
+      // Calculate timing constants
       const tempo = gameData.config.tempo;
-      const beatDuration = (60 / tempo) * 1000; // ms per beat
       const beatsPerMeasure = 4;
+      const beatDuration = (60 / tempo) * 1000;
       const measureDuration = beatDuration * beatsPerMeasure;
-      const countInDuration = measureDuration; // 1 measure count-in
+      const countInDuration = measureDuration;
 
+      // Simple polling for measure updates only
+      let lastMeasure = 0;
       measureIntervalRef.current = setInterval(() => {
-        const syncedTime = getSyncedTime();
-        const elapsed = syncedTime - gameData.startTime;
+        const elapsed = getSyncedTime() - gameData.startTime;
 
-        // Debug logging for Safari measure issue
-        if (elapsed > 1000000) {
-          console.error('[useStudentGame] Invalid elapsed time:', {
-            syncedTime,
-            startTime: gameData.startTime,
-            elapsed,
-            clockOffset
-          });
+        // Update current measure only when it changes
+        const currentMeasureNum = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
+        if (currentMeasureNum !== lastMeasure) {
+          lastMeasure = currentMeasureNum;
+          setCurrentMeasure(currentMeasureNum);
         }
-
-        // Account for count-in: measure 0 during count-in, then 1-based
-        let currentMeasureNum: number;
-        if (elapsed < countInDuration) {
-          // During count-in, keep measure at 0
-          currentMeasureNum = 0;
-        } else {
-          // After count-in, calculate actual measure number (1-based)
-          currentMeasureNum = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
-        }
-
-        setCurrentMeasure(currentMeasureNum);
-
-        // Check for segment changes based on synced time
-        const currentSeg = gameData.segments.find(seg =>
-          elapsed >= seg.startTime && elapsed < seg.endTime
-        );
-
-        if (currentSeg && currentSeg.noteValue !== currentSegmentRef.current?.noteValue) {
-          // Save previous segment before updating
-          previousSegmentRef.current = currentSegmentRef.current;
-          currentSegmentRef.current = currentSeg;
-          tapsInCurrentSegmentRef.current = 0;
-
-          console.log(`[useStudentGame] Segment changed: ${previousSegmentRef.current?.noteValue} -> ${currentSeg.noteValue}`);
-
-          // Update Zustand store so UI reflects the change
-          useStudentStore.getState().setCurrentSegment(currentSeg);
-
-          // Find next segment
-          const currentIndex = gameData.segments.findIndex(s =>
-            s.noteValue === currentSeg.noteValue && s.startTime === currentSeg.startTime
-          );
-          if (currentIndex >= 0 && currentIndex < gameData.segments.length - 1) {
-            setNextSegment(gameData.segments[currentIndex + 1]);
-          } else {
-            setNextSegment(null);
-          }
-        }
-      }, 100); // Check every 100ms
+      }, 100);
     };
 
     initGame();

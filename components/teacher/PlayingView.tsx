@@ -53,6 +53,38 @@ export function PlayingView() {
         setCurrentMeasure(currentMeasureNum);
       }, 100);
 
+      // Schedule segment changes (event-driven approach)
+      console.log('[Teacher] Scheduling', gameData.segments.length, 'segment timers');
+
+      // Calculate drift tolerance as 10% of shortest segment duration (tempo-aware)
+      const shortestSegmentDuration = Math.min(...gameData.segments.map(s => s.endTime - s.startTime));
+      const driftTolerance = shortestSegmentDuration * 0.1;
+      console.log('[Teacher] Drift tolerance:', driftTolerance, 'ms');
+
+      const segmentTimers: NodeJS.Timeout[] = [];
+      const currentElapsed = Date.now() - gameData.startTime;
+
+      gameData.segments.forEach((segment, index) => {
+        const delay = Math.max(0, segment.startTime - currentElapsed);
+
+        console.log(`[Teacher] Scheduling segment ${index + 1} (${segment.noteValue}) in ${delay}ms`);
+
+        const timer = setTimeout(() => {
+          console.log(`[Teacher] Segment ${index + 1} timer fired, emitting change-segment`);
+
+          // Emit to server so it broadcasts to all clients
+          socket.emit('change-segment', {
+            roomCode,
+            segmentIndex: index
+          });
+        }, delay);
+
+        segmentTimers.push(timer);
+      });
+
+      // Store segment timers for cleanup
+      (measureIntervalRef as any).segmentTimers = segmentTimers;
+
       // Auto-end timer - based on MEASURES not arbitrary time
       timerIntervalRef.current = setInterval(() => {
         const elapsed = Date.now() - gameData.startTime;
@@ -72,6 +104,9 @@ export function PlayingView() {
     return () => {
       if (measureIntervalRef.current) {
         clearInterval(measureIntervalRef.current);
+      }
+      if ((measureIntervalRef as any).segmentTimers) {
+        (measureIntervalRef as any).segmentTimers.forEach((timer: NodeJS.Timeout) => clearTimeout(timer));
       }
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -254,13 +289,12 @@ export function PlayingView() {
                 {leaderboard.topPlayers.map((player, index) => (
                   <div
                     key={player.rank}
-                    className={`rounded-lg p-4 ${
-                      index === 0
-                        ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-2 border-yellow-400'
-                        : index === 1
+                    className={`rounded-lg p-4 ${index === 0
+                      ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-2 border-yellow-400'
+                      : index === 1
                         ? 'bg-gradient-to-r from-gray-100 to-slate-100 border-2 border-gray-300'
                         : 'bg-gradient-to-r from-orange-100 to-red-100 border-2 border-orange-300'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -307,11 +341,10 @@ export function PlayingView() {
           <div className="flex gap-4">
             <button
               onClick={toggleMute}
-              className={`flex-1 px-6 py-4 rounded-xl font-semibold transition-colors ${
-                isMuted
-                  ? 'bg-gray-400 text-white hover:bg-gray-500'
-                  : 'bg-purple-500 text-white hover:bg-purple-600'
-              }`}
+              className={`flex-1 px-6 py-4 rounded-xl font-semibold transition-colors ${isMuted
+                ? 'bg-gray-400 text-white hover:bg-gray-500'
+                : 'bg-purple-500 text-white hover:bg-purple-600'
+                }`}
             >
               {isMuted ? '🔇 Unmute Metronome' : '🔊 Mute Metronome'}
             </button>

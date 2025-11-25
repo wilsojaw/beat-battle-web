@@ -58,10 +58,15 @@ interface StudentState {
   reset: () => void;
 }
 
+const getStoredValue = (key: string) => {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem(key);
+};
+
 const initialState = {
   view: 'joining' as StudentView,
-  roomCode: null,
-  playerName: '',
+  roomCode: getStoredValue('roomCode'),
+  playerName: getStoredValue('playerName') || '',
   playerCount: 0,
   playerNames: [],
   gameConfig: null,

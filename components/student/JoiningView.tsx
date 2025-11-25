@@ -38,64 +38,22 @@ export function JoiningView() {
     setLoading(true);
     setError('');
 
-    try {
-      // Perform clock synchronization
-      console.log('🕐 Starting clock synchronization...');
-      const offsets: number[] = [];
+    // Join the game (clock sync handled by SocketManager on connection)
+    socket.emit('join-game', {
+      roomCode: roomCode.trim().toUpperCase(),
+      playerName: playerName.trim()
+    }, (response: any) => {
+      if (response.success) {
+        // Store player info in Zustand store
+        joinRoom(roomCode.trim().toUpperCase(), playerName.trim());
 
-      for (let i = 0; i < 5; i++) {
-        const clientSendTime = Date.now();
-
-        await new Promise<void>((resolve) => {
-          socket.emit('time-sync', { clientTime: clientSendTime }, (response: any) => {
-            const clientReceiveTime = Date.now();
-            const roundTripTime = clientReceiveTime - clientSendTime;
-            const serverTime = response.serverTime;
-
-            // Calculate offset: server time - estimated client time when server responded
-            const estimatedClientTimeAtServer = clientSendTime + (roundTripTime / 2);
-            const offset = serverTime - estimatedClientTimeAtServer;
-
-            offsets.push(offset);
-            console.log(`Ping ${i + 1}: RTT=${roundTripTime}ms, Offset=${offset}ms`);
-            resolve();
-          });
-        });
-
-        // Small delay between pings
-        if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
+        // Transition to lobby view
+        setView('lobby');
+      } else {
+        setError(response.error || 'Failed to join game. Please check the room code.');
+        setLoading(false);
       }
-
-      // Calculate median offset (ignore outliers)
-      offsets.sort((a, b) => a - b);
-      const medianOffset = offsets[Math.floor(offsets.length / 2)];
-
-      console.log(`✅ Clock sync complete! Median offset: ${medianOffset}ms`);
-
-      // Store the time offset in Zustand store
-      useSocketStore.getState().setClockOffset(medianOffset);
-
-      // Join the game
-      socket.emit('join-game', {
-        roomCode: roomCode.trim().toUpperCase(),
-        playerName: playerName.trim()
-      }, (response: any) => {
-        if (response.success) {
-          // Store player info in Zustand store
-          joinRoom(roomCode.trim().toUpperCase(), playerName.trim());
-
-          // Transition to lobby view
-          setView('lobby');
-        } else {
-          setError(response.error || 'Failed to join game. Please check the room code.');
-          setLoading(false);
-        }
-      });
-
-    } catch (err) {
-      setError('Connection error. Please try again.');
-      setLoading(false);
-    }
+    });
   };
 
   const handleRoomCodeChange = (value: string) => {

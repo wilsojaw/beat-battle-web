@@ -51,24 +51,30 @@ export default function StudentGameContainer() {
         socket.emit('get-game-state', { roomCode: storedRoomCode }, (response: any) => {
           console.log('[StudentGameContainer] get-game-state response:', response);
 
-          if (!response.success) return;
+          if (!response.success || !response.game) return;
 
           const game = response.game;
 
           if (game.status === 'lobby') {
             useStudentStore.getState().setView('lobby');
-            useStudentStore.getState().setPlayerNames(game.players.map((p: any) => p.name));
-            useStudentStore.getState().setPlayerCount(game.players.length);
+            if (game.players && Array.isArray(game.players)) {
+              useStudentStore.getState().setPlayerNames(game.players.map((p: any) => p.name));
+              useStudentStore.getState().setPlayerCount(game.players.length);
+            }
             if (game.config) {
               useStudentStore.getState().setGameConfig(game.config);
             }
           } else if (game.status === 'playing') {
-            useStudentStore.getState().setGameData({
-              startTime: game.startTime,
-              segments: game.segments,
-              config: game.config,
-            });
-            useStudentStore.getState().setCurrentSegment(game.currentSegment);
+            if (game.startTime && game.segments && game.config) {
+              useStudentStore.getState().setGameData({
+                startTime: game.startTime,
+                segments: game.segments,
+                config: game.config,
+              });
+            }
+            if (game.currentSegment) {
+              useStudentStore.getState().setCurrentSegment(game.currentSegment);
+            }
             useStudentStore.getState().setView('playing');
           } else if (game.status === 'finished') {
             useStudentStore.getState().setView('finished');

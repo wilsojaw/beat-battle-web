@@ -25,12 +25,47 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
 
     // ==================== Connection State Handlers ====================
 
+    async function syncTime() {
+      console.log('[SocketManager] Starting background clock sync...');
+      const offsets: number[] = [];
+
+      for (let i = 0; i < 5; i++) {
+        const clientSendTime = Date.now();
+        try {
+          await new Promise<void>((resolve) => {
+            socket.emit('time-sync', { clientTime: clientSendTime }, (response: any) => {
+              const clientReceiveTime = Date.now();
+              const roundTripTime = clientReceiveTime - clientSendTime;
+              const serverTime = response.serverTime;
+              const estimatedClientTimeAtServer = clientSendTime + (roundTripTime / 2);
+              const offset = serverTime - estimatedClientTimeAtServer;
+              offsets.push(offset);
+              resolve();
+            });
+          });
+          if (i < 4) await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (e) {
+          console.error('[SocketManager] Sync ping failed', e);
+        }
+      }
+
+      if (offsets.length > 0) {
+        offsets.sort((a, b) => a - b);
+        const medianOffset = offsets[Math.floor(offsets.length / 2)];
+        console.log('[SocketManager] Clock sync complete. Offset:', medianOffset);
+        useSocketStore.getState().setClockOffset(medianOffset);
+      }
+    }
+
     function onConnect() {
       console.log('[Socket] Connected:', socket.id);
       useSocketStore.getState().setConnected(true);
       useSocketStore.getState().setSocketId(socket.id || null);
       useSocketStore.getState().setReconnecting(false);
       useSocketStore.getState().setError(null);
+
+      // Sync time on connection
+      syncTime();
     }
 
     function onDisconnect(reason: string) {
@@ -53,6 +88,9 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       console.log('[Socket] Reconnected after', attemptNumber, 'attempts');
       useSocketStore.getState().setConnected(true);
       useSocketStore.getState().setReconnecting(false);
+
+      // Sync time on reconnection
+      syncTime();
 
       // After reconnection, rejoin room if we have room code
       const studentRoomCode = useStudentStore.getState().roomCode;
@@ -391,6 +429,9 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       console.log('[SocketManager] Socket already connected');
       useSocketStore.getState().setConnected(true);
       useSocketStore.getState().setSocketId(socket.id || null);
+
+      // Sync time even if already connected (e.g., after hot reload or in Safari)
+      syncTime();
     }
 
     // ==================== Cleanup Function ====================
