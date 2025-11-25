@@ -3,6 +3,18 @@ import type { GameConfig, GameSegment, Player, GameResult } from '@/types/game';
 
 export type TeacherView = 'setup' | 'lobby' | 'playing' | 'finished';
 
+interface LeaderboardPlayer {
+  rank: number;
+  name: string;
+  accuracy: number;
+  hasStreak: boolean;
+}
+
+interface Leaderboard {
+  topPlayers: LeaderboardPlayer[];
+  totalPlayers: number;
+}
+
 interface TeacherState {
   // View state
   view: TeacherView;
@@ -25,6 +37,7 @@ interface TeacherState {
   } | null;
   currentSegment: GameSegment | null;
   countdown: number | null;
+  leaderboard: Leaderboard | null;
 
   // Results state
   results: GameResult[] | null;
@@ -40,6 +53,7 @@ interface TeacherState {
   setCountdown: (countdown: number | null) => void;
   setGameData: (data: { startTime: number; segments: GameSegment[]; config: GameConfig }) => void;
   setCurrentSegment: (segment: GameSegment) => void;
+  setLeaderboard: (leaderboard: Leaderboard | null) => void;
   setResults: (results: GameResult[]) => void;
   reset: () => void;
 }
@@ -53,6 +67,7 @@ const initialState = {
   gameData: null,
   currentSegment: null,
   countdown: null,
+  leaderboard: null,
   results: null,
 };
 
@@ -102,6 +117,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   setGameData: (gameData) => set({ gameData, view: 'playing' }),
 
   setCurrentSegment: (currentSegment) => set({ currentSegment }),
+
+  setLeaderboard: (leaderboard) => set({ leaderboard }),
 
   setResults: (results) => set({ results, view: 'finished' }),
 
