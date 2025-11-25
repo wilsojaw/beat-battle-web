@@ -107,10 +107,15 @@ export function useStudentGame() {
     };
   }, [gameData, getSyncedTime, setCurrentMeasure, setNextSegment]);
 
-  // Update current segment ref when it changes
+  // Update current segment ref when it changes (via socket events)
   useEffect(() => {
-    if (currentSegment) {
+    if (currentSegment && currentSegment.startTime !== currentSegmentRef.current?.startTime) {
+      // Save previous segment before updating
+      previousSegmentRef.current = currentSegmentRef.current;
       currentSegmentRef.current = currentSegment;
+
+      // Reset tap counter for new segment
+      tapsInCurrentSegmentRef.current = 0;
     }
   }, [currentSegment]);
 
