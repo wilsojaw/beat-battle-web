@@ -63,10 +63,10 @@ const getStoredValue = (key: string) => {
   return sessionStorage.getItem(key);
 };
 
-const initialState = {
+const createDefaultState = () => ({
   view: 'joining' as StudentView,
-  roomCode: getStoredValue('roomCode'),
-  playerName: getStoredValue('playerName') || '',
+  roomCode: null as string | null,
+  playerName: '',
   playerCount: 0,
   playerNames: [],
   gameConfig: null,
@@ -81,6 +81,12 @@ const initialState = {
   leaderboard: null,
   milestones: [],
   results: null,
+});
+
+const initialState = {
+  ...createDefaultState(),
+  roomCode: getStoredValue('roomCode'),
+  playerName: getStoredValue('playerName') || '',
 };
 
 export const useStudentStore = create<StudentState>((set, get) => ({
@@ -126,5 +132,11 @@ export const useStudentStore = create<StudentState>((set, get) => ({
 
   setResults: (results) => set({ results, view: 'finished' }),
 
-  reset: () => set(initialState),
+  reset: () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('roomCode');
+      sessionStorage.removeItem('playerName');
+    }
+    set(createDefaultState());
+  },
 }));

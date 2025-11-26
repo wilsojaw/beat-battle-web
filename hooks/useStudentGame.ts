@@ -52,19 +52,15 @@ export function useStudentGame() {
 
     const initGame = async () => {
       console.log('[useStudentGame] Initializing rhythm engine with tempo:', gameData.config.tempo);
+      console.log('[useStudentGame] Game data snapshot:', {
+        startTime: gameData.startTime,
+        segmentCount: gameData.segments.length,
+        firstSegment: gameData.segments[0],
+      });
 
       // Initialize rhythm engine
       rhythmEngineRef.current = new RhythmEngine(gameData.config.tempo);
-
-      // Skip audio initialization for Safari
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      if (!isSafari) {
-        await rhythmEngineRef.current.init();
-        rhythmEngineRef.current.start();
-        setIsPlaying(true);
-      } else {
-        console.log('[useStudentGame] Rhythm engine instantiated (audio context skipped for Safari compatibility)');
-      }
+      setIsPlaying(true);
 
       // Initialize segment refs from gameData
       const initialSegment = gameData.segments[0];
@@ -80,17 +76,55 @@ export function useStudentGame() {
       const beatDuration = (60 / tempo) * 1000;
       const measureDuration = beatDuration * beatsPerMeasure;
       const countInDuration = measureDuration;
+      const totalMeasures = gameData.segments[gameData.segments.length - 1]?.endMeasure ?? 0;
+      console.log('[useStudentGame] Measure constants:', {
+        totalMeasures,
+        measureDuration,
+        countInDuration,
+      });
 
       // Simple polling for measure updates only
       let lastMeasure = 0;
+      let tickCount = 0;
+
       measureIntervalRef.current = setInterval(() => {
-        const elapsed = getSyncedTime() - gameData.startTime;
+        if (!Number.isFinite(gameData.startTime)) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[useStudentGame] startTime is not finite yet, skipping tick', gameData.startTime);
+          }
+          return;
+        }
+
+        const now = getSyncedTime();
+        const elapsed = now - gameData.startTime;
 
         // Update current measure only when it changes
-        const currentMeasureNum = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
+        const rawMeasure = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
+        const currentMeasureNum = Math.min(totalMeasures, Math.max(0, rawMeasure));
+
+        if (process.env.NODE_ENV === 'development' && tickCount < 50) {
+          console.log('[useStudentGame] Measure tick', {
+            tick: tickCount,
+            now,
+            startTime: gameData.startTime,
+            elapsed,
+            rawMeasure,
+            currentMeasureNum,
+          });
+        }
+        tickCount += 1;
+
         if (currentMeasureNum !== lastMeasure) {
           lastMeasure = currentMeasureNum;
           setCurrentMeasure(currentMeasureNum);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[useStudentGame] Measure update', {
+              elapsed,
+              rawMeasure,
+              currentMeasureNum,
+              totalMeasures,
+            });
+          }
         }
       }, 100);
     };
@@ -103,7 +137,9 @@ export function useStudentGame() {
       }
       if (rhythmEngineRef.current) {
         rhythmEngineRef.current.stop();
+        rhythmEngineRef.current = null;
       }
+      setIsPlaying(false);
     };
   }, [gameData, getSyncedTime, setCurrentMeasure, setNextSegment]);
 

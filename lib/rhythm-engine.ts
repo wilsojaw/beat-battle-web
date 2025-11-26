@@ -137,14 +137,21 @@ export class RhythmEngine {
     }).toDestination();
 
     let beatCount = 0;
+    const COUNT_IN_BEATS = 4;
 
     this.transport.scheduleRepeat((time) => {
       if (this.metronomeSynth) {
-        // Every 4th beat (downbeat) is higher pitch and louder
+        const isCountIn = beatCount < COUNT_IN_BEATS;
         const isDownbeat = beatCount % 4 === 0;
-        const pitch = isDownbeat ? 'C3' : 'C2';  // Higher pitch for downbeat
 
-        this.metronomeSynth.triggerAttackRelease(pitch, '32n', time);
+        if (isCountIn) {
+          // Count-in: four low clicks so students line up with the teacher
+          this.metronomeSynth.triggerAttackRelease('C2', '32n', time);
+        } else {
+          // Gameplay: accent each downbeat
+          const pitch = isDownbeat ? 'C3' : 'C2';
+          this.metronomeSynth.triggerAttackRelease(pitch, '32n', time);
+        }
       }
       beatCount++;
     }, '4n');
