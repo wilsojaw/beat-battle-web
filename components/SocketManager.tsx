@@ -143,7 +143,7 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       }
     }
 
-    function onPlayerLeft(data: { totalPlayers: number; playerNames?: string[] }) {
+    function onPlayerLeft(data: { player?: Player; totalPlayers: number; playerNames?: string[] }) {
       console.log('[Student] Player left:', data);
       useStudentStore.getState().setPlayerCount(data.totalPlayers);
       if (data.playerNames) {
@@ -306,9 +306,12 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       useTeacherStore.getState().addPlayer(data.player);
     }
 
-    function onPlayerLeftTeacher(data: { playerId: string; totalPlayers: number; playerNames?: string[] }) {
-      console.log('[Teacher] Player left:', data.playerId);
-      useTeacherStore.getState().removePlayer(data.playerId);
+    function onPlayerLeftTeacher(data: { player?: Player; playerId?: string }) {
+      const playerId = data.player?.id || data.playerId;
+      console.log('[Teacher] Player left:', playerId);
+      if (playerId) {
+        useTeacherStore.getState().removePlayer(playerId);
+      }
     }
 
     function onPlayerConnectionStatus(data: { playerId: string; connected: boolean }) {
@@ -418,6 +421,7 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
 
     // Teacher events (using different handlers to avoid conflicts)
     // Note: Some events are shared (like countdown-start) but we handle them separately by role
+    socket.on('player-left', onPlayerLeftTeacher);
     socket.on('player-connection-status', onPlayerConnectionStatus);
     socket.on('player-tap', onPlayerTap);
 

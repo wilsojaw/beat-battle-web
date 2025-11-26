@@ -21,7 +21,10 @@ export function LobbyView() {
 
   const leaveGame = () => {
     // Leave the socket room
-    socket.emit('leave-game', { roomCode });
+    socket.emit('leave-game', {
+      roomCode,
+      playerName,
+    });
 
     // Reset store and go back home
     reset();

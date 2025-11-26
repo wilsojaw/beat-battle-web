@@ -714,6 +714,37 @@ app.prepare().then(() => {
       callback({ success: true, gameState: game });
     });
 
+    socket.on('leave-game', (data) => {
+      const { roomCode, playerName } = data;
+      const game = games.get(roomCode);
+      if (!game) return;
+
+      // Remove player if we're still in lobby
+      const playerIndex = game.players.findIndex((p) =>
+        p.id === socket.id || (playerName && p.name === playerName)
+      );
+
+      if (playerIndex === -1) return;
+
+      const player = game.players[playerIndex];
+      if (game.status === 'lobby') {
+        game.players.splice(playerIndex, 1);
+        socket.leave(roomCode);
+        io.to(roomCode).emit('player-left', {
+          player,
+          totalPlayers: game.players.length,
+          playerNames: game.players.map((p) => p.name),
+        });
+      } else {
+        player.connected = false;
+        io.to(roomCode).emit('player-connection-status', {
+          playerName: player.name,
+          connected: false,
+          allPlayersReady: game.players.every((p) => p.connected),
+        });
+      }
+    });
+
     socket.on('start-game', (data, callback) => {
       const game = games.get(data.roomCode);
 
