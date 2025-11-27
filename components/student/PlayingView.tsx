@@ -3,6 +3,8 @@
 import { useStudentStore } from '@/store/studentStore';
 import { useStudentGame } from '@/hooks/useStudentGame';
 import { NOTE_VALUES } from '@/types/game';
+import { NoteImage } from '@/components/NoteImage';
+import Image from 'next/image';
 import { LeaderboardPanel } from '@/components/LeaderboardPanel';
 import { MilestoneToast } from '@/components/MilestoneToast';
 
@@ -110,8 +112,16 @@ export function PlayingView() {
       {/* Main Content */}
       <div className="text-center text-white px-2 sm:px-4">
         {/* Note Symbol */}
-        <div className="text-[120px] sm:text-[160px] md:text-[200px] leading-none mb-4 sm:mb-8 animate-pulse">
-          {noteInfo.symbol}
+        <div className="flex justify-center mb-4 sm:mb-8 animate-pulse">
+          <div className="w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] md:w-[200px] md:h-[200px] relative">
+            <Image
+              src={noteInfo.imagePath}
+              alt={noteInfo.displayName}
+              fill
+              className="object-contain"
+              unoptimized
+            />
+          </div>
         </div>
 
         {/* Note Name */}
@@ -135,7 +145,9 @@ export function PlayingView() {
         <div className="absolute bottom-16 sm:bottom-24 left-0 right-0 text-center px-2">
           <div className="inline-block bg-white/20 backdrop-blur-sm px-4 sm:px-8 py-2 sm:py-4 rounded-2xl">
             <div className="text-white/60 text-xs sm:text-sm mb-1 sm:mb-2">Next Up</div>
-            <div className="text-4xl sm:text-6xl text-white/80">{NOTE_VALUES[nextSegment.noteValue].symbol}</div>
+            <div className="flex justify-center mb-2">
+              <NoteImage noteValue={nextSegment.noteValue} size={64} className="sm:w-16 sm:h-16" />
+            </div>
             <div className="text-white/80 text-sm sm:text-lg mt-1 sm:mt-2">{NOTE_VALUES[nextSegment.noteValue].displayName}</div>
           </div>
         </div>

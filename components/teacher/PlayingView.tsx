@@ -5,6 +5,7 @@ import { socket } from '@/lib/socket';
 import { useTeacherStore } from '@/store/teacherStore';
 import { RhythmEngine } from '@/lib/rhythm-engine';
 import { NOTE_VALUES } from '@/types/game';
+import { NoteImage } from '@/components/NoteImage';
 
 /**
  * PlayingView - Teacher monitoring during game (replaces /teacher/game)
@@ -210,8 +211,8 @@ export function PlayingView() {
           <div className="bg-white rounded-xl shadow-lg p-8">
             <h2 className="text-xl font-bold text-gray-700 mb-4">Current Note Value</h2>
             <div className="text-center">
-              <div className="text-[150px] leading-none mb-4">
-                {noteInfo.symbol}
+              <div className="flex justify-center mb-4">
+                <NoteImage noteValue={currentSegment.noteValue} size={150} />
               </div>
               <div className="text-3xl font-bold text-purple-600 mb-2">
                 {noteInfo.displayName}
@@ -224,10 +225,8 @@ export function PlayingView() {
             {nextSegment && (
               <div className="mt-6 p-4 bg-purple-50 rounded-lg">
                 <div className="text-sm text-gray-600 mb-1">Next up:</div>
-                <div className="flex items-center gap-3">
-                  <span className="text-4xl">
-                    {NOTE_VALUES[nextSegment.noteValue].symbol}
-                  </span>
+                <div className="flex items-center gap-3 justify-center">
+                  <NoteImage noteValue={nextSegment.noteValue} size={48} />
                   <span className="text-lg font-semibold text-gray-700">
                     {NOTE_VALUES[nextSegment.noteValue].displayName}
                   </span>

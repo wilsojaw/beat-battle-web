@@ -162,7 +162,7 @@ export const GAME_TEMPLATES: GameTemplate[] = [
     icon: '👑',
     settings: {
       tempo: 120,
-      noteValues: ['quarter', 'half', 'whole', 'eighth', 'dotted-quarter', 'dotted-eighth', 'sixteenth'],
+      noteValues: ['quarter', 'half', 'whole', 'eighth', 'dotted-quarter', 'sixteenth'],
       totalMeasures: 28,
       measuresPerSegment: 1,
       showNextNote: false,
@@ -260,7 +260,7 @@ export const GAME_TEMPLATES: GameTemplate[] = [
     icon: '🎭',
     settings: {
       tempo: 105,
-      noteValues: ['quarter', 'dotted-quarter', 'dotted-eighth'],
+      noteValues: ['quarter', 'dotted-quarter', 'eighth'],
       totalMeasures: 20,
       measuresPerSegment: 2,
       showNextNote: true,

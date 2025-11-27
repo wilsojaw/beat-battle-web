@@ -6,7 +6,6 @@ export type NoteValue =
   | 'whole'
   | 'eighth'
   | 'dotted-quarter'
-  | 'dotted-eighth'
   | 'sixteenth';
 
 export interface NoteValueInfo {
@@ -15,6 +14,8 @@ export interface NoteValueInfo {
   displayName: string;
   tapsPerBeat: number; // For calculating expected tap timing
   description: string;
+  imagePath: string; // Path to note image graphic
+  imageScale?: number; // Optional scale adjustment for image sizing
 }
 
 export const NOTE_VALUES: Record<NoteValue, NoteValueInfo> = {
@@ -23,49 +24,49 @@ export const NOTE_VALUES: Record<NoteValue, NoteValueInfo> = {
     symbol: '♩',
     displayName: 'Quarter Note',
     tapsPerBeat: 1,
-    description: 'Tap once every beat'
+    description: 'Tap once every beat',
+    imagePath: '/graphics/quarter_note.png'
   },
   'half': {
     name: 'half',
     symbol: '𝅗𝅥',
     displayName: 'Half Note',
     tapsPerBeat: 0.5,
-    description: 'Tap once every 2 beats'
+    description: 'Tap once every 2 beats',
+    imagePath: '/graphics/half_note.png'
   },
   'whole': {
     name: 'whole',
     symbol: '𝅝',
     displayName: 'Whole Note',
     tapsPerBeat: 0.25,
-    description: 'Tap once every 4 beats'
+    description: 'Tap once every 4 beats',
+    imagePath: '/graphics/whole_note.png',
+    imageScale: 0.9
   },
   'eighth': {
     name: 'eighth',
     symbol: '♪',
     displayName: 'Eighth Note',
     tapsPerBeat: 2,
-    description: 'Tap twice every beat'
+    description: 'Tap twice every beat',
+    imagePath: '/graphics/eighth_note.png'
   },
   'dotted-quarter': {
     name: 'dotted-quarter',
     symbol: '♩.',
     displayName: 'Dotted Quarter',
     tapsPerBeat: 0.667,
-    description: 'Tap every 3 eighth notes'
-  },
-  'dotted-eighth': {
-    name: 'dotted-eighth',
-    symbol: '♪.',
-    displayName: 'Dotted Eighth',
-    tapsPerBeat: 1.333,
-    description: 'Tap every 3 sixteenth notes'
+    description: 'Tap every 3 eighth notes',
+    imagePath: '/graphics/dotted_quarter.png'
   },
   'sixteenth': {
     name: 'sixteenth',
     symbol: '𝅘𝅥𝅯',
     displayName: 'Sixteenth Note',
     tapsPerBeat: 4,
-    description: 'Tap 4 times every beat'
+    description: 'Tap 4 times every beat',
+    imagePath: '/graphics/sixteenth_note.png'
   }
 };
 

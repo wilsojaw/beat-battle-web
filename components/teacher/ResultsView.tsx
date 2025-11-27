@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useTeacherStore } from '@/store/teacherStore';
 import type { GameResult, NoteValue } from '@/types/game';
 import { NOTE_VALUES } from '@/types/game';
+import { NoteImage } from '@/components/NoteImage';
 
 /**
  * ResultsView - Teacher results dashboard (replaces /teacher/results)
@@ -110,7 +111,9 @@ export function ResultsView() {
             {/* Most Struggled */}
             <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-xl p-4">
               <div className="text-center">
-                <div className="text-3xl mb-1">{NOTE_VALUES[classStats.mostStruggledNote].symbol}</div>
+                <div className="flex justify-center mb-1">
+                  <NoteImage noteValue={classStats.mostStruggledNote} size={48} />
+                </div>
                 <div className="text-sm text-gray-600">Most Struggled Note</div>
                 <div className="text-xs text-gray-500 mt-1">
                   {NOTE_VALUES[classStats.mostStruggledNote].displayName}

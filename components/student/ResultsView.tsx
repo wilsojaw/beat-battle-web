@@ -2,6 +2,7 @@
 
 import { useStudentStore } from '@/store/studentStore';
 import { NOTE_VALUES } from '@/types/game';
+import { NoteImage } from '@/components/NoteImage';
 import type { GameResult } from '@/types/game';
 
 /**
@@ -53,10 +54,12 @@ export function ResultsView() {
   const totalPlayers = results.results.length;
 
   const getStarRating = (accuracy: number): number => {
-    if (accuracy >= 90) return 3;
-    if (accuracy >= 70) return 2;
+    if (accuracy >= 95) return 5;
+    if (accuracy >= 85) return 4;
+    if (accuracy >= 75) return 3;
+    if (accuracy >= 65) return 2;
     if (accuracy >= 50) return 1;
-    return 0;
+    return 1;
   };
 
   const stars = getStarRating(myResult.overallAccuracy);
@@ -99,7 +102,7 @@ export function ResultsView() {
               {/* Stars */}
               <div className="text-3xl">
                 {'⭐'.repeat(stars)}
-                {'☆'.repeat(3 - stars)}
+                {'☆'.repeat(Math.max(0, 5 - stars))}
               </div>
             </div>
           </div>
@@ -111,8 +114,8 @@ export function ResultsView() {
               <div className="text-center">
                 <div className="text-2xl mb-1">✅</div>
                 <div className="text-xs text-gray-600 mb-1">You nailed</div>
-                <div className="text-3xl mb-1">
-                  {NOTE_VALUES[myResult.bestNoteType].symbol}
+                <div className="flex justify-center mb-1">
+                  <NoteImage noteValue={myResult.bestNoteType} size={48} />
                 </div>
                 <div className="text-sm font-semibold text-gray-700">
                   {NOTE_VALUES[myResult.bestNoteType].displayName}
@@ -125,8 +128,8 @@ export function ResultsView() {
               <div className="text-center">
                 <div className="text-2xl mb-1">🎯</div>
                 <div className="text-xs text-gray-600 mb-1">Practice more</div>
-                <div className="text-3xl mb-1">
-                  {NOTE_VALUES[myResult.worstNoteType].symbol}
+                <div className="flex justify-center mb-1">
+                  <NoteImage noteValue={myResult.worstNoteType} size={48} />
                 </div>
                 <div className="text-sm font-semibold text-gray-700">
                   {NOTE_VALUES[myResult.worstNoteType].displayName}
