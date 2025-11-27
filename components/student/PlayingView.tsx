@@ -4,6 +4,7 @@ import { useStudentStore } from '@/store/studentStore';
 import { useStudentGame } from '@/hooks/useStudentGame';
 import { NOTE_VALUES } from '@/types/game';
 import { NoteImage } from '@/components/NoteImage';
+import { StaffTimeline } from '@/components/StaffTimeline';
 import Image from 'next/image';
 import { LeaderboardPanel } from '@/components/LeaderboardPanel';
 import { MilestoneToast } from '@/components/MilestoneToast';
@@ -54,6 +55,11 @@ export function PlayingView() {
 
   const noteInfo = NOTE_VALUES[currentSegment.noteValue];
   const showNextNote = gameConfig?.showNextNote ?? true;
+  const measuresPerSegment =
+    gameConfig?.measuresPerSegment ||
+    gameConfig?.segmentDuration ||
+    currentSegment.durationBars ||
+    1;
 
   return (
     <div
@@ -107,6 +113,15 @@ export function PlayingView() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Staff Timeline */}
+      <div className="w-full px-2 sm:px-4 mb-6 sm:mb-10 -mt-32 sm:-mt-40">
+        <StaffTimeline
+          noteValue={currentSegment.noteValue}
+          measuresPerSegment={measuresPerSegment}
+          isCountIn={false}
+        />
       </div>
 
       {/* Main Content */}

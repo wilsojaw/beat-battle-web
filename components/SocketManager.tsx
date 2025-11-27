@@ -252,8 +252,9 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
     }
 
     function onLeaderboardUpdate(update: LeaderboardUpdate) {
-      console.log('[Student] Leaderboard update:', update);
+      console.log('[Socket] Leaderboard update:', update);
       useStudentStore.getState().setLeaderboard(update);
+      useTeacherStore.getState().setLeaderboard(update);
     }
 
     function onPersonalStatsUpdate(stats: PersonalStats) {

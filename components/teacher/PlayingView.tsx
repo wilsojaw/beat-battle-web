@@ -13,7 +13,7 @@ import { NoteImage } from '@/components/NoteImage';
  * Shows current segment, metrics, leaderboard, and game controls
  */
 export function PlayingView() {
-  const { roomCode, gameData, currentSegment, countdown, players, leaderboard } = useTeacherStore();
+  const { roomCode, gameData, currentSegment, countdown, players, leaderboard, previewMode } = useTeacherStore();
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -27,7 +27,7 @@ export function PlayingView() {
 
   // Initialize rhythm engine and metronome
   useEffect(() => {
-    if (!gameData) return;
+    if (!gameData || previewMode) return;
 
     const initGame = async () => {
       // Initialize rhythm engine with metronome
@@ -117,7 +117,15 @@ export function PlayingView() {
         rhythmEngineRef.current.dispose();
       }
     };
-  }, [gameData]);
+  }, [gameData, previewMode]);
+
+  useEffect(() => {
+    if (previewMode && gameData) {
+      setIsPlaying(true);
+      setCurrentMeasure(4);
+      setTimeRemaining(120000);
+    }
+  }, [previewMode, gameData]);
 
   // Calculate total taps from all players
   useEffect(() => {
@@ -174,8 +182,8 @@ export function PlayingView() {
   const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 py-8 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 py-8 px-4 flex items-center justify-center">
+      <div className="max-w-7xl w-full">
         {/* Top Bar */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <div className="flex justify-between items-center">

@@ -41,6 +41,7 @@ interface TeacherState {
 
   // Results state
   results: GameResult[] | null;
+  previewMode: boolean;
 
   // Actions
   setView: (view: TeacherView) => void;
@@ -55,6 +56,7 @@ interface TeacherState {
   setCurrentSegment: (segment: GameSegment) => void;
   setLeaderboard: (leaderboard: Leaderboard | null) => void;
   setResults: (results: GameResult[]) => void;
+  setPreviewMode: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -69,6 +71,7 @@ const initialState = {
   countdown: null,
   leaderboard: null,
   results: null,
+  previewMode: false,
 };
 
 export const useTeacherStore = create<TeacherState>((set, get) => ({
@@ -121,6 +124,8 @@ export const useTeacherStore = create<TeacherState>((set, get) => ({
   setLeaderboard: (leaderboard) => set({ leaderboard }),
 
   setResults: (results) => set({ results, view: 'finished' }),
+
+  setPreviewMode: (previewMode) => set({ previewMode }),
 
   reset: () => set(initialState),
 }));

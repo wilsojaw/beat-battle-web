@@ -24,6 +24,7 @@ export function useStudentGame() {
     addTap,
     setCurrentMeasure,
     setNextSegment,
+  previewMode,
   } = useStudentStore();
 
   const { clockOffset } = useSocketStore();
@@ -47,7 +48,12 @@ export function useStudentGame() {
 
   // Initialize rhythm engine when game starts
   useEffect(() => {
-    if (!gameData) return;
+    if (!gameData || previewMode) {
+      if (previewMode) {
+        setIsPlaying(true);
+      }
+      return;
+    }
     if (rhythmEngineRef.current) return; // Prevent double initialization
 
     const initGame = async () => {
@@ -141,7 +147,7 @@ export function useStudentGame() {
       }
       setIsPlaying(false);
     };
-  }, [gameData, getSyncedTime, setCurrentMeasure, setNextSegment]);
+  }, [gameData, getSyncedTime, setCurrentMeasure, setNextSegment, previewMode]);
 
   // Update current segment ref when it changes (via socket events)
   useEffect(() => {
@@ -157,6 +163,10 @@ export function useStudentGame() {
 
   // Handle tap
   const handleTap = useCallback(() => {
+    if (previewMode) {
+      return;
+    }
+
     if (!isPlaying || !currentSegmentRef.current || !rhythmEngineRef.current) {
       return;
     }
@@ -225,7 +235,7 @@ export function useStudentGame() {
 
     // Clear feedback
     setTimeout(() => setFeedback(null), 100);
-  }, [isPlaying, getSyncedTime, addTap, roomCode]);
+  }, [isPlaying, getSyncedTime, addTap, roomCode, previewMode]);
 
   return {
     isPlaying,

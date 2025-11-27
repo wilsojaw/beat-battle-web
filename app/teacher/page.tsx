@@ -7,6 +7,7 @@ import { SetupView } from '@/components/teacher/SetupView';
 import { LobbyView } from '@/components/teacher/LobbyView';
 import { PlayingView } from '@/components/teacher/PlayingView';
 import { ResultsView } from '@/components/teacher/ResultsView';
+import { activateTeacherPreview, shouldUseTeacherPreview } from '@/lib/preview-mode';
 
 /**
  * TeacherGameContainer - Single-page container for entire teacher flow
@@ -27,6 +28,11 @@ export default function TeacherGameContainer() {
   useEffect(() => {
     // Try to restore session from sessionStorage
     if (typeof window === 'undefined') return;
+
+    if (shouldUseTeacherPreview()) {
+      activateTeacherPreview();
+      return;
+    }
 
     const storedRoomCode = sessionStorage.getItem('roomCode');
     const storedTeacherName = sessionStorage.getItem('teacherName');

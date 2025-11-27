@@ -38,6 +38,7 @@ interface StudentState {
 
   // Results state
   results: any | null;
+  previewMode: boolean;
 
   // Actions
   setView: (view: StudentView) => void;
@@ -55,6 +56,7 @@ interface StudentState {
   setLeaderboard: (leaderboard: LeaderboardUpdate) => void;
   addMilestone: (milestone: MilestoneEvent) => void;
   setResults: (results: any) => void;
+  setPreviewMode: (enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -81,6 +83,7 @@ const createDefaultState = () => ({
   leaderboard: null,
   milestones: [],
   results: null,
+  previewMode: false,
 });
 
 const initialState = {
@@ -131,6 +134,8 @@ export const useStudentStore = create<StudentState>((set, get) => ({
   })),
 
   setResults: (results) => set({ results, view: 'finished' }),
+
+  setPreviewMode: (previewMode) => set({ previewMode }),
 
   reset: () => {
     if (typeof window !== 'undefined') {

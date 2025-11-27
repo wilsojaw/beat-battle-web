@@ -8,6 +8,7 @@ import { LobbyView } from '@/components/student/LobbyView';
 import { CountdownView } from '@/components/student/CountdownView';
 import { PlayingView } from '@/components/student/PlayingView';
 import { ResultsView } from '@/components/student/ResultsView';
+import { activateStudentPreview, shouldUseStudentPreview } from '@/lib/preview-mode';
 
 /**
  * StudentGameContainer - Single-page container for entire student flow
@@ -29,6 +30,11 @@ export default function StudentGameContainer() {
   useEffect(() => {
     // Try to restore session from sessionStorage
     if (typeof window === 'undefined') return;
+
+    if (shouldUseStudentPreview()) {
+      activateStudentPreview();
+      return;
+    }
 
     const storedRoomCode = sessionStorage.getItem('roomCode');
     const storedPlayerName = sessionStorage.getItem('playerName');
