@@ -64,7 +64,7 @@ export function PlayingView() {
   return (
     <div
       onClick={handleTap}
-      className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center justify-center cursor-pointer select-none relative overflow-hidden"
+      className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center cursor-pointer select-none relative overflow-hidden"
     >
       {/* Feedback Animation */}
       {feedback && (
@@ -116,18 +116,19 @@ export function PlayingView() {
       </div>
 
       {/* Staff Timeline */}
-      <div className="w-full px-2 sm:px-4 mb-6 sm:mb-10 -mt-32 sm:-mt-40">
+      <div className="w-full px-2 sm:px-4 mb-0 sm:mb-1 mt-8 sm:mt-12">
         <StaffTimeline
           noteValue={currentSegment.noteValue}
           measuresPerSegment={measuresPerSegment}
-          isCountIn={false}
+          isCountIn={currentMeasure === 0}
+          tempo={gameConfig?.tempo}
         />
       </div>
 
       {/* Main Content */}
       <div className="text-center text-white px-2 sm:px-4">
         {/* Note Symbol */}
-        <div className="flex justify-center mb-4 sm:mb-8 animate-pulse">
+        <div className="flex justify-center mb-1 sm:mb-2 animate-pulse">
           <div className="w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] md:w-[200px] md:h-[200px] relative">
             <Image
               src={noteInfo.imagePath}
@@ -140,12 +141,12 @@ export function PlayingView() {
         </div>
 
         {/* Note Name */}
-        <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-2 sm:mb-4">
+        <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-1 sm:mb-2">
           {noteInfo.displayName}
         </h2>
 
         {/* Instructions */}
-        <p className="text-sm sm:text-xl md:text-2xl mb-4 sm:mb-8 bg-white/20 backdrop-blur-sm px-4 sm:px-8 py-2 sm:py-4 rounded-full max-w-md mx-auto">
+        <p className="text-sm sm:text-xl md:text-2xl mb-1 sm:mb-2 bg-white/20 backdrop-blur-sm px-4 sm:px-8 py-2 sm:py-4 rounded-full max-w-md mx-auto">
           {noteInfo.description}
         </p>
 
@@ -157,7 +158,7 @@ export function PlayingView() {
 
       {/* Next Note Preview */}
       {showNextNote && nextSegment && (
-        <div className="absolute bottom-16 sm:bottom-24 left-0 right-0 text-center px-2">
+        <div className="w-full text-center px-2 mt-8 sm:mt-12">
           <div className="inline-block bg-white/20 backdrop-blur-sm px-4 sm:px-8 py-2 sm:py-4 rounded-2xl">
             <div className="text-white/60 text-xs sm:text-sm mb-1 sm:mb-2">Next Up</div>
             <div className="flex justify-center mb-2">

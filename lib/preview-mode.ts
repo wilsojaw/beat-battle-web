@@ -119,5 +119,15 @@ export function activateStudentPreview() {
   store.setPersonalStats(mockStudentStats);
   store.setCountdown(null);
   store.setCurrentMeasure(3);
+  
+  // Check for view parameter in URL to override default 'playing' view
+  if (typeof window !== 'undefined') {
+    const viewParam = new URLSearchParams(window.location.search).get('view');
+    if (viewParam && ['joining', 'lobby', 'countdown', 'playing', 'finished'].includes(viewParam)) {
+      store.setView(viewParam as 'joining' | 'lobby' | 'countdown' | 'playing' | 'finished');
+    } else {
+      store.setView('playing'); // Default to playing view for in-game screen
+    }
+  }
 }
 

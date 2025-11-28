@@ -24,3 +24,28 @@ body {
   color: var(--foreground);
   font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
+
+/* Note drop-in animation for staff timeline - matches original Lottie timing */
+@keyframes note-drop {
+  0% {
+    transform: translateX(-50%) translateY(-700px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(-50%) translateY(-50%);
+    opacity: 1;
+  }
+}
+
+.animate-note-drop {
+  opacity: 0; /* Hidden until animation starts */
+  transform: translateX(-50%) translateY(-700px); /* Start position */
+  animation-name: note-drop;
+  animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1); /* Smooth ease-out without excessive overshoot */
+}
+
+/* Static note position (not animating) */
+.note-static {
+  transform: translateX(-50%) translateY(-50%);
+  opacity: 1;
+}
