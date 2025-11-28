@@ -23,8 +23,9 @@ export function useStudentGame() {
     currentSegment,
     addTap,
     setCurrentMeasure,
+    setCurrentSegment,
     setNextSegment,
-  previewMode,
+    previewMode,
   } = useStudentStore();
 
   const { clockOffset } = useSocketStore();
@@ -48,12 +49,28 @@ export function useStudentGame() {
 
   // Initialize rhythm engine when game starts
   useEffect(() => {
-    if (!gameData || previewMode) {
-      if (previewMode) {
-        setIsPlaying(true);
-      }
-      return;
+    if (!gameData) return;
+
+    if (previewMode) {
+      setIsPlaying(true);
+
+      // Cycle through segments every 5 seconds in preview mode
+      let segmentIndex = 0;
+      const segmentCycleInterval = setInterval(() => {
+        segmentIndex = (segmentIndex + 1) % gameData.segments.length;
+        const nextSegment = gameData.segments[segmentIndex];
+        const nextNextSegment = gameData.segments[(segmentIndex + 1) % gameData.segments.length];
+
+        setCurrentSegment(nextSegment);
+        setNextSegment(nextNextSegment);
+        console.log('[Preview] Student cycling to segment:', nextSegment.noteValue);
+      }, 5000);
+
+      return () => {
+        clearInterval(segmentCycleInterval);
+      };
     }
+
     if (rhythmEngineRef.current) return; // Prevent double initialization
 
     const initGame = async () => {

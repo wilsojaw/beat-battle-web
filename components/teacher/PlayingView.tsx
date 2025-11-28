@@ -124,6 +124,19 @@ export function PlayingView() {
       setIsPlaying(true);
       setCurrentMeasure(4);
       setTimeRemaining(120000);
+
+      // Cycle through segments every 5 seconds in preview mode
+      let segmentIndex = 0;
+      const segmentCycleInterval = setInterval(() => {
+        segmentIndex = (segmentIndex + 1) % gameData.segments.length;
+        const nextSegment = gameData.segments[segmentIndex];
+        useTeacherStore.getState().setCurrentSegment(nextSegment);
+        console.log('[Preview] Cycling to segment:', nextSegment.noteValue);
+      }, 5000);
+
+      return () => {
+        clearInterval(segmentCycleInterval);
+      };
     }
   }, [previewMode, gameData]);
 

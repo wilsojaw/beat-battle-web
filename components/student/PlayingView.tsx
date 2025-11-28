@@ -118,6 +118,7 @@ export function PlayingView() {
       {/* Staff Timeline */}
       <div className="w-full px-2 sm:px-4 mb-6 sm:mb-10 -mt-32 sm:-mt-40">
         <StaffTimeline
+          key={currentSegment.noteValue}
           noteValue={currentSegment.noteValue}
           measuresPerSegment={measuresPerSegment}
           isCountIn={false}
