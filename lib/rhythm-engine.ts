@@ -1,10 +1,18 @@
 // Rhythm Engine using Tone.js for precise timing
 import * as Tone from 'tone';
-import type { NoteValue, GameConfig } from '@/types/game';
+import { Midi } from '@tonejs/midi';
+import type { NoteValue, GameConfig, AudioMetadata } from '@/types/game';
 import { NOTE_VALUES } from '@/types/game';
+
+// Beat marker from MIDI file
+export interface MidiBeatMarker {
+  beat: number;      // Beat number (0-indexed)
+  time: number;      // Time in seconds from start of MIDI
+}
 
 export class RhythmEngine {
   private metronome: Tone.Player | null = null;
+  private songPlayer: Tone.Player | null = null;
   private transport: typeof Tone.Transport;
   private tempo: number;
   private isPlaying: boolean = false;
@@ -13,6 +21,12 @@ export class RhythmEngine {
   private startTime: number = 0;
   private metronomeSynth: Tone.MembraneSynth | null = null;
   private isMuted: boolean = false;
+  private hasSong: boolean = false;
+  
+  // MIDI sync data
+  private midiData: Midi | null = null;
+  private midiBeatMarkers: MidiBeatMarker[] = [];
+  private hasMidi: boolean = false;
 
   constructor(tempo: number) {
     this.tempo = tempo;
@@ -77,6 +91,11 @@ export class RhythmEngine {
   // Get current time in milliseconds since start
   getCurrentTime(): number {
     return (Tone.now() - this.startTime) * 1000;
+  }
+
+  // Get current transport time in seconds
+  getTransportSeconds(): number {
+    return this.transport.seconds;
   }
 
   // Get the expected tap times for a given note value
@@ -182,17 +201,144 @@ export class RhythmEngine {
     return this.isMuted;
   }
 
-  // Load and play a song
-  async loadSong(url: string) {
-    const player = new Tone.Player(url).toDestination();
-    await player.load(url);
-    this.metronome = player;
-    return player;
+  // Load MIDI file and extract beat markers
+  async loadMidi(midiUrl: string) {
+    try {
+      const response = await fetch(midiUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      this.midiData = new Midi(arrayBuffer);
+      
+      // Extract beat markers from the first track's notes
+      // Each note in the MIDI represents a beat
+      this.midiBeatMarkers = [];
+      
+      if (this.midiData.tracks.length > 0) {
+        const track = this.midiData.tracks[0];
+        track.notes.forEach((note, index) => {
+          this.midiBeatMarkers.push({
+            beat: index,
+            time: note.time  // Time in seconds
+          });
+        });
+      }
+      
+      this.hasMidi = true;
+      return this.midiData;
+    } catch (error) {
+      console.error('[RhythmEngine] Failed to load MIDI:', error);
+      this.hasMidi = false;
+      return null;
+    }
   }
 
-  playSong() {
-    if (this.metronome) {
-      this.metronome.start();
+  // Load a song for playback (synced to transport)
+  async loadSong(audioMetadata: AudioMetadata) {
+    // Load MIDI first if available
+    if (audioMetadata.midiUrl) {
+      await this.loadMidi(audioMetadata.midiUrl);
+    }
+    
+    // Load audio
+    this.songPlayer = new Tone.Player(audioMetadata.audioUrl).toDestination();
+    await this.songPlayer.load(audioMetadata.audioUrl);
+    
+    // Sync player to transport so it starts/stops with transport
+    this.songPlayer.sync();
+    
+    this.hasSong = true;
+    return this.songPlayer;
+  }
+
+  // Start the song (call after transport.start())
+  startSong() {
+    if (this.songPlayer && this.hasSong) {
+      // Start from the beginning, synced to transport
+      this.songPlayer.start(0);
+    }
+  }
+
+  // Stop the song
+  stopSong() {
+    if (this.songPlayer) {
+      this.songPlayer.stop();
+    }
+  }
+
+  // Check if a song is loaded
+  hasSongLoaded(): boolean {
+    return this.hasSong;
+  }
+
+  // Check if MIDI is loaded
+  hasMidiLoaded(): boolean {
+    return this.hasMidi;
+  }
+
+  // Get beat markers from MIDI
+  getBeatMarkers(): MidiBeatMarker[] {
+    return this.midiBeatMarkers;
+  }
+
+  // Get the current beat number based on MIDI timing
+  getCurrentBeatFromMidi(): number {
+    if (!this.hasMidi || this.midiBeatMarkers.length === 0) {
+      // Fallback to mathematical calculation
+      return Math.floor(this.transport.seconds / (60 / this.tempo));
+    }
+
+    const currentTime = this.transport.seconds;
+    
+    // Find the last beat marker that has passed
+    let currentBeat = 0;
+    for (let i = 0; i < this.midiBeatMarkers.length; i++) {
+      if (this.midiBeatMarkers[i].time <= currentTime) {
+        currentBeat = this.midiBeatMarkers[i].beat;
+      } else {
+        break;
+      }
+    }
+    
+    return currentBeat;
+  }
+
+
+  // Get the current measure number based on MIDI timing (assumes 4/4 time)
+  getCurrentMeasureFromMidi(beatsPerMeasure: number = 4): number {
+    const currentBeat = this.getCurrentBeatFromMidi();
+    return Math.floor(currentBeat / beatsPerMeasure);
+  }
+
+  // Schedule callbacks based on MIDI beat markers
+  onMidiBeat(callback: (beat: number, measure: number) => void, beatsPerMeasure: number = 4) {
+    if (!this.hasMidi || this.midiBeatMarkers.length === 0) {
+      // Fallback to mathematical beat scheduling
+      this.transport.scheduleRepeat((time) => {
+        const beat = Math.floor(this.transport.seconds / (60 / this.tempo));
+        const measure = Math.floor(beat / beatsPerMeasure);
+        callback(beat, measure);
+      }, '4n');
+      return;
+    }
+
+    // Schedule a callback for each MIDI beat marker
+    this.midiBeatMarkers.forEach((marker) => {
+      this.transport.schedule((time) => {
+        const measure = Math.floor(marker.beat / beatsPerMeasure);
+        callback(marker.beat, measure);
+      }, marker.time);
+    });
+  }
+
+  // Mute/unmute the song
+  muteSong() {
+    if (this.songPlayer) {
+      this.songPlayer.volume.value = -Infinity;
+    }
+  }
+
+  unmuteSong() {
+    if (this.songPlayer) {
+      this.songPlayer.volume.value = 0;
     }
   }
 
@@ -203,6 +349,11 @@ export class RhythmEngine {
     }
     if (this.metronomeSynth) {
       this.metronomeSynth.dispose();
+    }
+    if (this.songPlayer) {
+      this.songPlayer.dispose();
+      this.songPlayer = null;
+      this.hasSong = false;
     }
   }
 }

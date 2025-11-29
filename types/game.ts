@@ -72,6 +72,16 @@ export const NOTE_VALUES: Record<NoteValue, NoteValueInfo> = {
 
 export type LeaderboardStyle = 'full' | 'top3' | 'stars-only';
 export type ScoringProfile = 'accuracy-only' | 'accuracy-with-streak';
+export type TimeSignature = '4/4' | '3/4' | '2/4' | '6/8';
+
+// Audio metadata for songs
+export interface AudioMetadata {
+  songId: string;        // ID of the song from the catalog
+  audioUrl: string;      // Path to audio file
+  midiUrl: string;       // Path to MIDI file for timing sync
+  tempo: number;         // BPM of the song
+  timeSignature: TimeSignature;
+}
 
 export interface GameConfig {
   tempo: number; // BPM
@@ -84,6 +94,9 @@ export interface GameConfig {
   scoringProfile: ScoringProfile;
   leaderboardStyle: LeaderboardStyle;
   songName?: string;
+  timeSignature?: TimeSignature; // Time signature (default 4/4)
+  audio?: AudioMetadata; // Audio configuration (if using a song)
+  segmentPattern?: NoteValue[]; // Specific order of note values (for songs with choreography)
 }
 
 export interface Player {

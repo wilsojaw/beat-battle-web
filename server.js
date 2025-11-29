@@ -316,11 +316,16 @@ function generateGameSegments(config) {
   const countInBeats = beatsPerMeasure;
   const countInOffset = countInBeats * beatDuration * 1000; // ms
 
+  // Use segmentPattern if provided (for songs with specific choreography)
+  // Otherwise cycle through noteValues
+  const usePattern = config.segmentPattern && config.segmentPattern.length > 0;
+  const noteSource = usePattern ? config.segmentPattern : config.noteValues;
+
   let currentMeasure = 0;
   let noteValueIndex = 0;
 
   while (currentMeasure < totalMeasures) {
-    const noteValue = config.noteValues[noteValueIndex % config.noteValues.length];
+    const noteValue = noteSource[noteValueIndex % noteSource.length];
     const startBeat = currentMeasure * beatsPerMeasure;
     const endMeasure = Math.min(currentMeasure + measuresPerSegment, totalMeasures);
     const endBeat = endMeasure * beatsPerMeasure;
@@ -338,7 +343,7 @@ function generateGameSegments(config) {
     noteValueIndex++;
   }
 
-  console.log(`Generated ${segments.length} segments from ${totalMeasures} measures (${measuresPerSegment} measures per segment)`);
+  console.log(`Generated ${segments.length} segments from ${totalMeasures} measures (${measuresPerSegment} measures per segment)${usePattern ? ' using segment pattern' : ''}`);
   return segments;
 }
 
@@ -355,11 +360,11 @@ function logTimingDataForExcel(game) {
     'Note Value',
     'Expected Interval (ms)',
     'Tap Number',
-    'Tap Timestamp (ms)',
+    'Relative Time (ms)',
     'Actual Interval (ms)',
     'Interval Error (ms)',
     'Accuracy (%)',
-    'Global Time (ms)'
+    'Absolute Timestamp'
   ].join(','));
 
   const beatDuration = (60 / game.config.tempo) * 1000; // ms per beat
@@ -373,13 +378,18 @@ function logTimingDataForExcel(game) {
     }
 
     player.taps.forEach((tap, index) => {
+      // Calculate relative time from game start
+      const relativeTime = tap.timestamp - game.startTime;
+      
       // Find which segment this tap belongs to
       const segment = game.segments.find(s =>
-        tap.timestamp >= s.startTime && tap.timestamp < s.endTime
+        relativeTime >= s.startTime && relativeTime < s.endTime
       ) || game.segments[game.segments.length - 1]; // fallback to last segment
 
-      // Calculate which measure this tap is in
-      const measureNum = Math.floor(tap.timestamp / measureDuration) + 1;
+      // Calculate which measure this tap is in (accounting for count-in)
+      const countInDuration = measureDuration; // 1 measure count-in
+      const gameTime = relativeTime - countInDuration;
+      const measureNum = gameTime > 0 ? Math.floor(gameTime / measureDuration) + 1 : 0;
 
       // Calculate expected interval based on note value
       const expectedInterval = tap.expectedInterval || 0;
@@ -393,21 +403,21 @@ function logTimingDataForExcel(game) {
       // Accuracy percentage (100% = perfect)
       const accuracyPercent = actualInterval > 0 ? Math.max(0, 100 - Math.abs(intervalError) / 2) : 0;
 
-      // Global timestamp
-      const globalTime = game.startTime + tap.timestamp;
+      // Relative time from game start (ms)
+      const relativeTimeMs = relativeTime;
 
       console.log([
         player.name,
         measureNum,
-        `${segment.startMeasure}-${segment.endMeasure}`,
+        `${segment.startMeasure || '?'}-${segment.endMeasure || '?'}`,
         tap.noteValue || 'unknown',
         expectedInterval.toFixed(2),
         index + 1,
-        tap.timestamp.toFixed(2),
+        relativeTimeMs.toFixed(2),
         actualInterval.toFixed(2),
         intervalError.toFixed(2),
         accuracyPercent.toFixed(2),
-        globalTime.toFixed(2)
+        tap.timestamp.toFixed(2)
       ].join(','));
     });
   });
@@ -911,6 +921,19 @@ app.prepare().then(() => {
 
       game.currentSegment = game.segments[data.segmentIndex];
       io.to(data.roomCode).emit('segment-changed', { segment: game.currentSegment });
+    });
+
+    // Teacher notifies when transport (audio) actually starts
+    socket.on('transport-started', (data) => {
+      const game = games.get(data.roomCode);
+      if (!game || game.teacher.id !== socket.id) return;
+
+      console.log(`[Server] Transport started for room ${data.roomCode} at ${data.transportStartTime}`);
+      
+      // Broadcast to all students so they can sync their timing
+      io.to(data.roomCode).emit('transport-started', { 
+        transportStartTime: data.transportStartTime 
+      });
     });
 
     socket.on('end-game', (data, callback) => {

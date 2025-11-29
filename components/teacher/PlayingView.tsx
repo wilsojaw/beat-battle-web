@@ -30,13 +30,28 @@ export function PlayingView() {
     if (!gameData || previewMode) return;
 
     const initGame = async () => {
-      // Initialize rhythm engine with metronome
+      // Initialize rhythm engine
       rhythmEngineRef.current = new RhythmEngine(gameData.config.tempo);
       await rhythmEngineRef.current.init();
 
-      // Start metronome for teacher
-      rhythmEngineRef.current.startMetronome();
-      rhythmEngineRef.current.start();
+      // Check if we have a song to play
+      const hasAudio = gameData.config.audio && gameData.config.audio.audioUrl;
+      
+      if (hasAudio && gameData.config.audio) {
+        // Load and play the song
+        await rhythmEngineRef.current.loadSong(gameData.config.audio);
+        rhythmEngineRef.current.start();
+        rhythmEngineRef.current.startSong();
+        
+        // Notify server/students of actual transport start time
+        const transportStartTime = Date.now();
+        socket.emit('transport-started', { roomCode, transportStartTime });
+      } else {
+        // No song - use metronome
+        rhythmEngineRef.current.startMetronome();
+        rhythmEngineRef.current.start();
+      }
+      
       setIsPlaying(true);
 
       // Calculate timing based on measures and tempo
@@ -45,34 +60,43 @@ export function PlayingView() {
       const beatDuration = (60 / tempo) * 1000; // ms per beat
       const measureDuration = beatDuration * beatsPerMeasure; // ms per measure
       const countInDuration = measureDuration; // 1 measure count-in
+      const countInBeats = beatsPerMeasure; // Count-in is 1 measure
       const totalMeasures = gameData.config.totalMeasures || 16;
       const totalGameDuration = measureDuration * totalMeasures; // Duration based on measures
 
+      // Use interval to poll current measure (works for both MIDI and fallback)
       measureIntervalRef.current = setInterval(() => {
-        const elapsed = Date.now() - gameData.startTime;
-        const currentMeasureNum = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
-        setCurrentMeasure(currentMeasureNum);
-      }, 100);
+        if (rhythmEngineRef.current?.hasMidiLoaded()) {
+          // MIDI-based timing: get current beat from MIDI markers
+          const currentBeat = rhythmEngineRef.current.getCurrentBeatFromMidi();
+          
+          // Account for count-in (first 4 beats are count-in)
+          let newMeasure: number;
+          if (currentBeat < countInBeats) {
+            newMeasure = 0; // Count-in
+          } else {
+            // Calculate gameplay measure (subtract count-in, then divide by beats per measure)
+            const gameplayBeat = currentBeat - countInBeats;
+            newMeasure = Math.floor(gameplayBeat / beatsPerMeasure) + 1;
+          }
+          
+          setCurrentMeasure(newMeasure);
+        } else {
+          // Fallback to mathematical timing
+          const elapsed = Date.now() - gameData.startTime;
+          const currentMeasureNum = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
+          setCurrentMeasure(currentMeasureNum);
+        }
+      }, 50); // Poll every 50ms for responsive updates
 
       // Schedule segment changes (event-driven approach)
-      console.log('[Teacher] Scheduling', gameData.segments.length, 'segment timers');
-
-      // Calculate drift tolerance as 10% of shortest segment duration (tempo-aware)
-      const shortestSegmentDuration = Math.min(...gameData.segments.map(s => s.endTime - s.startTime));
-      const driftTolerance = shortestSegmentDuration * 0.1;
-      console.log('[Teacher] Drift tolerance:', driftTolerance, 'ms');
-
       const segmentTimers: NodeJS.Timeout[] = [];
       const currentElapsed = Date.now() - gameData.startTime;
 
       gameData.segments.forEach((segment, index) => {
         const delay = Math.max(0, segment.startTime - currentElapsed);
 
-        console.log(`[Teacher] Scheduling segment ${index + 1} (${segment.noteValue}) in ${delay}ms`);
-
         const timer = setTimeout(() => {
-          console.log(`[Teacher] Segment ${index + 1} timer fired, emitting change-segment`);
-
           // Emit to server so it broadcasts to all clients
           socket.emit('change-segment', {
             roomCode,
@@ -135,10 +159,24 @@ export function PlayingView() {
 
   const toggleMute = () => {
     if (rhythmEngineRef.current) {
-      rhythmEngineRef.current.toggleMute();
-      setIsMuted(!isMuted);
+      const newMuted = !isMuted;
+      if (rhythmEngineRef.current.hasSongLoaded()) {
+        // Mute/unmute song
+        if (newMuted) {
+          rhythmEngineRef.current.muteSong();
+        } else {
+          rhythmEngineRef.current.unmuteSong();
+        }
+      } else {
+        // Mute/unmute metronome
+        rhythmEngineRef.current.toggleMute();
+      }
+      setIsMuted(newMuted);
     }
   };
+  
+  // Determine audio label for UI
+  const audioLabel = gameData?.config.audio ? 'Audio' : 'Metronome';
 
   const endGame = () => {
     socket.emit('end-game', { roomCode });
@@ -353,7 +391,7 @@ export function PlayingView() {
                 : 'bg-purple-500 text-white hover:bg-purple-600'
                 }`}
             >
-              {isMuted ? '🔇 Unmute Metronome' : '🔊 Mute Metronome'}
+              {isMuted ? `🔇 Unmute ${audioLabel}` : `🔊 Mute ${audioLabel}`}
             </button>
 
             <button

@@ -1,0 +1,11 @@
+# Audio files directory
+# Place your song audio files (.mp3) and MIDI files (.mid) here
+# 
+# Expected files:
+# - slow-groove.mp3 + slow-groove.mid (80 BPM)
+# - steady-beat.mp3 + steady-beat.mid (100 BPM)
+# - upbeat-fun.mp3 + upbeat-fun.mid (120 BPM)
+#
+# Each audio file should include a 1-measure count-in at the beginning.
+# The MIDI file should have quarter notes marking each beat, including the count-in.
+

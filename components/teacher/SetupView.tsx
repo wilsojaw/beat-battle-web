@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { socket } from '@/lib/socket';
 import { useTeacherStore } from '@/store/teacherStore';
-import type { GameConfig, NoteValue } from '@/types/game';
+import type { GameConfig, NoteValue, AudioMetadata } from '@/types/game';
 import { NOTE_VALUES } from '@/types/game';
 import { NoteImage } from '@/components/NoteImage';
 import { TemplatePickerModal } from '@/components/TemplatePickerModal';
 import type { GameTemplate } from '@/lib/game-templates';
+import { ALL_AUDIO_OPTIONS, isMetronomeOption, calculateMeasures, getGameplayDuration, formatDuration, type Song } from '@/lib/songs';
 
 /**
  * SetupView - Teacher game configuration (replaces /teacher/setup)
@@ -18,6 +19,7 @@ export function SetupView() {
   const { setView, createRoom, setGameConfig } = useTeacherStore();
 
   const [teacherName, setTeacherName] = useState('Teacher');
+  const [selectedSong, setSelectedSong] = useState<Song>(ALL_AUDIO_OPTIONS[0]); // Default to metronome
   const [tempo, setTempo] = useState(100);
   const [selectedNotes, setSelectedNotes] = useState<NoteValue[]>(['quarter', 'eighth', 'half']);
   const [totalMeasures, setTotalMeasures] = useState(16);
@@ -27,6 +29,41 @@ export function SetupView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+
+  // Derived state
+  const isMetronome = isMetronomeOption(selectedSong);
+  const effectiveTempo = isMetronome ? tempo : selectedSong.tempo;
+  const effectiveMeasures = isMetronome ? totalMeasures : calculateMeasures(selectedSong);
+  const effectiveTimeSignature = selectedSong.timeSignature;
+  const beatsPerMeasure = effectiveTimeSignature === '3/4' ? 3 : effectiveTimeSignature === '6/8' ? 6 : effectiveTimeSignature === '2/4' ? 2 : 4;
+  const songDuration = isMetronome ? null : getGameplayDuration(selectedSong);
+  
+  // Locked settings (some songs have specific choreography)
+  const hasLockedNotes = !isMetronome && !!selectedSong.lockedNoteValues;
+  const hasLockedMeasuresPerSegment = !isMetronome && !!selectedSong.lockedMeasuresPerSegment;
+  const effectiveNotes = hasLockedNotes ? selectedSong.lockedNoteValues! : selectedNotes;
+  const effectiveMeasuresPerSegment = hasLockedMeasuresPerSegment ? selectedSong.lockedMeasuresPerSegment! : measuresPerSegment;
+
+  // Handle song selection
+  const handleSongChange = (songId: string) => {
+    const song = ALL_AUDIO_OPTIONS.find(s => s.id === songId);
+    if (song) {
+      setSelectedSong(song);
+      // Apply song's settings (locked or suggested)
+      if (!isMetronomeOption(song)) {
+        if (song.lockedNoteValues) {
+          setSelectedNotes(song.lockedNoteValues);
+        } else {
+          setSelectedNotes(song.suggestedNoteValues);
+        }
+        if (song.lockedMeasuresPerSegment) {
+          setMeasuresPerSegment(song.lockedMeasuresPerSegment);
+        } else {
+          setMeasuresPerSegment(song.suggestedMeasuresPerSegment);
+        }
+      }
+    }
+  };
 
   const noteOptions: NoteValue[] = ['quarter', 'half', 'whole', 'eighth', 'dotted-quarter', 'sixteenth'];
 
@@ -65,16 +102,29 @@ export function SetupView() {
     setError('');
 
     try {
+      // Build audio metadata if a song is selected
+      const audioMetadata: AudioMetadata | undefined = !isMetronome ? {
+        songId: selectedSong.id,
+        audioUrl: selectedSong.audioUrl,
+        midiUrl: selectedSong.midiUrl,
+        tempo: selectedSong.tempo,
+        timeSignature: selectedSong.timeSignature
+      } : undefined;
+
       const config: GameConfig = {
-        tempo,
-        noteValues: selectedNotes,
-        segmentDuration: measuresPerSegment,
+        tempo: effectiveTempo,
+        noteValues: effectiveNotes,
+        segmentDuration: effectiveMeasuresPerSegment,
         totalDuration: 0, // Not used anymore
-        totalMeasures,
-        measuresPerSegment,
+        totalMeasures: effectiveMeasures,
+        measuresPerSegment: effectiveMeasuresPerSegment,
         showNextNote,
         scoringProfile: 'accuracy-only',
-        leaderboardStyle
+        leaderboardStyle,
+        timeSignature: effectiveTimeSignature,
+        songName: isMetronome ? undefined : selectedSong.name,
+        audio: audioMetadata,
+        segmentPattern: selectedSong.segmentPattern // Specific order of note values (if song has choreography)
       };
 
       socket.emit('create-game', { teacherName: teacherName.trim(), config }, (response: any) => {
@@ -103,10 +153,9 @@ export function SetupView() {
   };
 
   // Calculate total game duration based on measures, tempo, and time signature
-  // This makes it easy to support different time signatures in the future
-  const calculateGameDuration = (measures: number, bpm: number, beatsPerMeasure: number = 4) => {
+  const calculateGameDuration = (measures: number, bpm: number, beats: number = 4) => {
     const secondsPerBeat = 60 / bpm;
-    const secondsPerMeasure = secondsPerBeat * beatsPerMeasure;
+    const secondsPerMeasure = secondsPerBeat * beats;
     const totalSeconds = secondsPerMeasure * measures;
 
     const minutes = Math.floor(totalSeconds / 60);
@@ -115,7 +164,7 @@ export function SetupView() {
     return { totalSeconds, minutes, seconds };
   };
 
-  const gameDuration = calculateGameDuration(totalMeasures, tempo);
+  const gameDuration = calculateGameDuration(effectiveMeasures, effectiveTempo, beatsPerMeasure);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-red-500 flex items-start sm:items-center justify-center py-6 px-4">
@@ -159,20 +208,53 @@ export function SetupView() {
                 />
               </div>
 
-              {/* Tempo */}
+              {/* Song Selection */}
               <div>
                 <label className="block text-base font-semibold text-gray-700 mb-1">
-                  Tempo (BPM) - ♩ = {tempo}
+                  Audio Track
+                </label>
+                <select
+                  value={selectedSong.id}
+                  onChange={(e) => handleSongChange(e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:outline-none text-base text-gray-900 bg-white cursor-pointer"
+                  disabled={loading}
+                >
+                  {ALL_AUDIO_OPTIONS.map((song) => (
+                    <option key={song.id} value={song.id}>
+                      {song.icon} {song.name} {!isMetronomeOption(song) ? `(${song.tempo} BPM)` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {selectedSong.description}
+                </p>
+                {!isMetronome && songDuration && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex items-center gap-2 text-sm text-blue-700">
+                      <span>🎵</span>
+                      <span>
+                        <strong>{selectedSong.name}</strong> · {selectedSong.tempo} BPM · {effectiveTimeSignature} · {formatDuration(songDuration)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Tempo */}
+              <div className={!isMetronome ? 'opacity-50' : ''}>
+                <label className="block text-base font-semibold text-gray-700 mb-1">
+                  Tempo (BPM) - ♩ = {effectiveTempo}
+                  {!isMetronome && <span className="text-xs font-normal text-gray-500 ml-2">(set by song)</span>}
                 </label>
                 <input
                   type="range"
                   min="60"
                   max="180"
                   step="5"
-                  value={tempo}
+                  value={effectiveTempo}
                   onChange={(e) => setTempo(parseInt(e.target.value))}
-                  className="w-full h-3 bg-purple-200 rounded-lg appearance-none cursor-pointer"
-                  disabled={loading}
+                  className="w-full h-3 bg-purple-200 rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed"
+                  disabled={loading || !isMetronome}
                 />
                 <div className="flex justify-between text-xs text-gray-600 mt-1">
                   <span>60 (Slow)</span>
@@ -181,21 +263,27 @@ export function SetupView() {
               </div>
 
               {/* Note Values */}
-              <div>
+              <div className={hasLockedNotes ? 'opacity-60' : ''}>
                 <label className="block text-base font-semibold text-gray-700 mb-2">
                   Note Values to Use
+                  {hasLockedNotes && <span className="text-xs font-normal text-gray-500 ml-2">(set by song)</span>}
                 </label>
+                {hasLockedNotes && selectedSong.segmentPattern && (
+                  <div className="mb-2 p-2 bg-blue-50 rounded-lg border border-blue-100 text-xs text-blue-700">
+                    <strong>Pattern:</strong> {selectedSong.segmentPattern.map(n => NOTE_VALUES[n].displayName).join(' → ')}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
                   {noteOptions.map((note) => (
                     <button
                       key={note}
-                      onClick={() => toggleNote(note)}
-                      disabled={loading}
+                      onClick={() => !hasLockedNotes && toggleNote(note)}
+                      disabled={loading || hasLockedNotes}
                       className={`p-3 rounded-lg border-2 transition-all ${
-                        selectedNotes.includes(note)
+                        effectiveNotes.includes(note)
                           ? 'bg-purple-500 border-purple-600 text-white'
                           : 'bg-white border-gray-200 text-gray-700 hover:border-purple-400'
-                      }`}
+                      } ${hasLockedNotes ? 'cursor-not-allowed' : ''}`}
                     >
                       <div className="mb-1 flex justify-center">
                         <NoteImage noteValue={note} size={42} />
@@ -209,19 +297,20 @@ export function SetupView() {
 
             <div className="space-y-5">
               {/* Total Measures */}
-              <div>
+              <div className={!isMetronome ? 'opacity-50' : ''}>
                 <label className="block text-base font-semibold text-gray-700 mb-1">
-                  Total Measures - {totalMeasures}
+                  Total Measures - {effectiveMeasures}
+                  {!isMetronome && <span className="text-xs font-normal text-gray-500 ml-2">(set by song)</span>}
                 </label>
                 <input
                   type="range"
                   min="4"
                   max="32"
                   step="4"
-                  value={totalMeasures}
+                  value={effectiveMeasures}
                   onChange={(e) => setTotalMeasures(parseInt(e.target.value))}
-                  className="w-full h-3 bg-pink-200 rounded-lg appearance-none cursor-pointer"
-                  disabled={loading}
+                  className="w-full h-3 bg-pink-200 rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed"
+                  disabled={loading || !isMetronome}
                 />
                 <div className="flex justify-between text-xs text-gray-600 mt-1">
                   <span>4 measures</span>
@@ -230,33 +319,42 @@ export function SetupView() {
                 <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xs text-gray-600 mb-1">Game Duration (4/4 time)</div>
+                      <div className="text-xs text-gray-600 mb-1">Game Duration ({effectiveTimeSignature} time)</div>
                       <div className="text-2xl font-bold text-purple-600">
-                        {gameDuration.minutes}:{gameDuration.seconds.toString().padStart(2, '0')}
+                        {isMetronome ? (
+                          <>{gameDuration.minutes}:{gameDuration.seconds.toString().padStart(2, '0')}</>
+                        ) : (
+                          formatDuration(songDuration || 0)
+                        )}
                       </div>
                     </div>
                     <div className="text-3xl">⏱️</div>
                   </div>
                   <div className="text-[11px] text-gray-500 mt-1">
-                    {totalMeasures} measures × {tempo} BPM = {Math.round(gameDuration.totalSeconds)} seconds
+                    {isMetronome ? (
+                      <>{effectiveMeasures} measures × {effectiveTempo} BPM = {Math.round(gameDuration.totalSeconds)} seconds</>
+                    ) : (
+                      <>{selectedSong.name} · {effectiveMeasures} measures at {effectiveTempo} BPM</>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Measures Per Segment */}
-              <div>
+              <div className={hasLockedMeasuresPerSegment ? 'opacity-50' : ''}>
                 <label className="block text-base font-semibold text-gray-700 mb-1">
-                  Measures Per Note Value - {measuresPerSegment}
+                  Measures Per Note Value - {effectiveMeasuresPerSegment}
+                  {hasLockedMeasuresPerSegment && <span className="text-xs font-normal text-gray-500 ml-2">(set by song)</span>}
                 </label>
                 <input
                   type="range"
                   min="1"
                   max="8"
                   step="1"
-                  value={measuresPerSegment}
+                  value={effectiveMeasuresPerSegment}
                   onChange={(e) => setMeasuresPerSegment(parseInt(e.target.value))}
-                  className="w-full h-3 bg-blue-200 rounded-lg appearance-none cursor-pointer"
-                  disabled={loading}
+                  className="w-full h-3 bg-blue-200 rounded-lg appearance-none cursor-pointer disabled:cursor-not-allowed"
+                  disabled={loading || hasLockedMeasuresPerSegment}
                 />
                 <div className="flex justify-between text-xs text-gray-600 mt-1">
                   <span>1 measure</span>

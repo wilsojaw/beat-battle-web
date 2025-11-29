@@ -20,11 +20,12 @@ export function useStudentGame() {
     roomCode,
     playerName,
     gameData,
+    transportStartTime,
     currentSegment,
     addTap,
     setCurrentMeasure,
     setNextSegment,
-  previewMode,
+    previewMode,
   } = useStudentStore();
 
   const { clockOffset } = useSocketStore();
@@ -57,13 +58,6 @@ export function useStudentGame() {
     if (rhythmEngineRef.current) return; // Prevent double initialization
 
     const initGame = async () => {
-      console.log('[useStudentGame] Initializing rhythm engine with tempo:', gameData.config.tempo);
-      console.log('[useStudentGame] Game data snapshot:', {
-        startTime: gameData.startTime,
-        segmentCount: gameData.segments.length,
-        firstSegment: gameData.segments[0],
-      });
-
       // Initialize rhythm engine
       rhythmEngineRef.current = new RhythmEngine(gameData.config.tempo);
       setIsPlaying(true);
@@ -71,7 +65,6 @@ export function useStudentGame() {
       // Initialize segment refs from gameData
       const initialSegment = gameData.segments[0];
       if (initialSegment) {
-        console.log('[useStudentGame] Initializing with first segment:', initialSegment.noteValue);
         currentSegmentRef.current = initialSegment;
         previousSegmentRef.current = initialSegment;
       }
@@ -83,54 +76,28 @@ export function useStudentGame() {
       const measureDuration = beatDuration * beatsPerMeasure;
       const countInDuration = measureDuration;
       const totalMeasures = gameData.segments[gameData.segments.length - 1]?.endMeasure ?? 0;
-      console.log('[useStudentGame] Measure constants:', {
-        totalMeasures,
-        measureDuration,
-        countInDuration,
-      });
 
       // Simple polling for measure updates only
       let lastMeasure = 0;
-      let tickCount = 0;
 
       measureIntervalRef.current = setInterval(() => {
-        if (!Number.isFinite(gameData.startTime)) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[useStudentGame] startTime is not finite yet, skipping tick', gameData.startTime);
-          }
+        // Get the effective start time - use transportStartTime if available (for songs)
+        const effectiveStartTime = useStudentStore.getState().transportStartTime || gameData.startTime;
+        
+        if (!Number.isFinite(effectiveStartTime)) {
           return;
         }
 
         const now = getSyncedTime();
-        const elapsed = now - gameData.startTime;
+        const elapsed = now - effectiveStartTime;
 
         // Update current measure only when it changes
         const rawMeasure = Math.floor((elapsed - countInDuration) / measureDuration) + 1;
         const currentMeasureNum = Math.min(totalMeasures, Math.max(0, rawMeasure));
 
-        if (process.env.NODE_ENV === 'development' && tickCount < 50) {
-          console.log('[useStudentGame] Measure tick', {
-            tick: tickCount,
-            now,
-            startTime: gameData.startTime,
-            elapsed,
-            rawMeasure,
-            currentMeasureNum,
-          });
-        }
-        tickCount += 1;
-
         if (currentMeasureNum !== lastMeasure) {
           lastMeasure = currentMeasureNum;
           setCurrentMeasure(currentMeasureNum);
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[useStudentGame] Measure update', {
-              elapsed,
-              rawMeasure,
-              currentMeasureNum,
-              totalMeasures,
-            });
-          }
         }
       }, 100);
     };

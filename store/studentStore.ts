@@ -25,6 +25,7 @@ interface StudentState {
     segments: GameSegment[];
     config: GameConfig;
   } | null;
+  transportStartTime: number | null; // When audio actually starts (for songs)
   currentSegment: GameSegment | null;
   nextSegment: GameSegment | null;
   currentMeasure: number;
@@ -48,6 +49,7 @@ interface StudentState {
   setGameConfig: (config: GameConfig) => void;
   setCountdown: (countdown: number | null) => void;
   setGameData: (data: { startTime: number; segments: GameSegment[]; config: GameConfig }) => void;
+  setTransportStartTime: (time: number) => void;
   setCurrentSegment: (segment: GameSegment) => void;
   setNextSegment: (segment: GameSegment | null) => void;
   setCurrentMeasure: (measure: number) => void;
@@ -74,6 +76,7 @@ const createDefaultState = () => ({
   gameConfig: null,
   countdown: null,
   gameData: null,
+  transportStartTime: null as number | null,
   currentSegment: null,
   nextSegment: null,
   currentMeasure: 0,
@@ -118,6 +121,10 @@ export const useStudentStore = create<StudentState>((set, get) => ({
       totalMeasures,
       view: 'playing'
     });
+  },
+
+  setTransportStartTime: (transportStartTime) => {
+    set({ transportStartTime });
   },
 
   setCurrentSegment: (currentSegment) => set({ currentSegment }),

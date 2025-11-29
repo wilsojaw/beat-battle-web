@@ -217,8 +217,11 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       // Teacher is already in playing view from countdown-start
     }
 
+    function onTransportStarted(data: { transportStartTime: number }) {
+      useStudentStore.getState().setTransportStartTime(data.transportStartTime);
+    }
+
     function onSegmentChanged(data: { segment: GameSegment }) {
-      console.log('[Student] Segment changed:', data.segment.noteValue);
       const segments = useStudentStore.getState().gameData?.segments || [];
 
       useStudentStore.getState().setCurrentSegment(data.segment);
@@ -413,6 +416,7 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
     socket.on('countdown-start', onCountdownStart);
     socket.on('countdown-tick', onCountdownTick);
     socket.on('game-started', onGameStarted);
+    socket.on('transport-started', onTransportStarted);
     socket.on('segment-changed', onSegmentChanged);
     socket.on('game-ended', onGameEnded);
     socket.on('milestone-achieved', onMilestoneAchieved);
@@ -459,6 +463,7 @@ export function SocketManager({ children }: { children: React.ReactNode }) {
       socket.off('countdown-start', onCountdownStart);
       socket.off('countdown-tick', onCountdownTick);
       socket.off('game-started', onGameStarted);
+      socket.off('transport-started', onTransportStarted);
       socket.off('segment-changed', onSegmentChanged);
       socket.off('game-ended', onGameEnded);
       socket.off('milestone-achieved', onMilestoneAchieved);
