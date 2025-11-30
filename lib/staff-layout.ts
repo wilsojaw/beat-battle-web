@@ -8,11 +8,11 @@ const BEATS_PER_MEASURE = 4;
 // ← Change these arrays to adjust where notes appear horizontally within each measure
 const MEASURE_LAYOUTS: Record<number, number[]> = {
   1: [0.4], // 1 note per measure (whole note) - positioned at beat 1, matching first quarter note
-  2: [0.4, 0.7], // 2 notes per measure (half notes) - positioned at beats 1 and 3, matching quarter note pattern
-  3: [0.18, 0.5, 0.82], // 3 notes per measure
-  4: [0.4, 0.55, 0.7, 0.85], // 4 notes per measure (quarter notes)
-  6: [0.08, 0.24, 0.4, 0.6, 0.76, 0.92], // 6 notes per measure
-  8: [0.4, 0.475, 0.55, 0.625, 0.7, 0.775, 0.85, 0.925], // 8 notes per measure (eighth notes) - positioned between quarter notes
+  2: [0.4, 0.68], // 2 notes per measure (half notes) - positioned at beats 1 and 3
+  3: [0.18, 0.5, 0.78], // 3 notes per measure
+  4: [0.38, 0.52, 0.66, 0.80], // 4 notes per measure (quarter notes) - moved left to prevent clipping on mobile
+  6: [0.08, 0.24, 0.4, 0.56, 0.72, 0.88], // 6 notes per measure
+  8: [0.4, 0.475, 0.55, 0.625, 0.7, 0.775, 0.85, 0.925], // 8 notes per measure (eighth notes) - uses grouped image, not affected
   16: Array.from({ length: 16 }, (_, i) => 0.04 + (i * 0.92) / 15), // 16 notes per measure (sixteenth notes)
 };
 
