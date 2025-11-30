@@ -20,6 +20,9 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
+        {/* Mobile console for debugging - remove after testing */}
+        <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+        <script dangerouslySetInnerHTML={{ __html: 'eruda.init();' }} />
       </head>
       <body className="antialiased">
         <ErrorBoundary>
