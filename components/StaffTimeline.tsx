@@ -218,6 +218,7 @@ export function StaffTimeline({ noteValue, measuresPerSegment, isCountIn, tempo 
                   style={{
                     left: `${note.position * 100}%`,
                     top: noteTop,
+                    transform: 'translateX(-50%)',
                     ...(isCountIn ? {
                       animationDuration: `${noteDropDurationMs}ms`,
                       animationDelay: `${noteStartDelayMs + (noteStaggerMs * index)}ms`,

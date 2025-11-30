@@ -63,7 +63,8 @@ export function PlayingView() {
 
   return (
     <div
-      onClick={handleTap}
+      onTouchStart={handleTap}
+      onMouseDown={handleTap}
       className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center justify-between cursor-pointer select-none relative overflow-hidden"
     >
       {/* Feedback Animation */}
@@ -136,7 +137,7 @@ export function PlayingView() {
       </div>
 
       {/* Main Content */}
-      <div className="text-center text-white px-2 sm:px-4 flex-1 flex flex-col justify-center">
+      <div className="text-center text-white px-2 sm:px-4 sm:flex-1 flex flex-col justify-center">
         {/* Note Symbol */}
         <div className="flex justify-center mb-1 sm:mb-2 animate-pulse">
           <div className="w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] md:w-[200px] md:h-[200px] relative">
