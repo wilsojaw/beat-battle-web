@@ -68,6 +68,8 @@ export function PlayingView() {
   const TAP_DEBOUNCE_MS = 150; // Ignore taps within 150ms of each other
 
   const onTapStart = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault(); // Prevent default to avoid ghost clicks
+    
     const now = Date.now();
     const eventType = 'type' in e ? 'touch' : 'mouse';
     const timeSinceLastTap = now - lastTapTimeRef.current;
