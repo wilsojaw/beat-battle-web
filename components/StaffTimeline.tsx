@@ -211,28 +211,36 @@ export function StaffTimeline({ noteValue, measuresPerSegment, isCountIn, tempo 
               </>
             ) : (
               // Regular rendering for other note types
-              notePositions.map((note, index) => (
-                <div
-                  key={`${noteValue}-${index}`}
-                  className={`absolute ${isCountIn ? 'animate-note-drop' : 'note-static'}`}
-                  style={{
-                    left: `${note.position * 100}%`,
-                    top: noteTop,
-                    transform: 'translateX(-50%) translateY(-50%)',
-                    ...(isCountIn ? {
-                      animationDuration: `${noteDropDurationMs}ms`,
-                      animationDelay: `${noteStartDelayMs + (noteStaggerMs * index)}ms`,
-                      animationFillMode: 'forwards',
-                    } : {}),
-                  }}
-                >
-                  <NoteImage
-                    noteValue={noteValue}
-                    size={noteSize}
-                    className="drop-shadow-xl"
-                  />
-                </div>
-              ))
+              notePositions.map((note, index) => {
+                const noteStyle = {
+                  left: `${note.position * 100}%`,
+                  top: noteTop,
+                  transform: 'translateX(-50%) translateY(-50%)',
+                  ...(isCountIn ? {
+                    animationDuration: `${noteDropDurationMs}ms`,
+                    animationDelay: `${noteStartDelayMs + (noteStaggerMs * index)}ms`,
+                    animationFillMode: 'forwards',
+                  } : {}),
+                };
+                
+                if (index === 0) {
+                  console.log(`[STAFF] Note ${index}: position=${note.position}, left=${note.position * 100}%, top=${noteTop}, transform=translateX(-50%) translateY(-50%), noteSize=${noteSize}`);
+                }
+                
+                return (
+                  <div
+                    key={`${noteValue}-${index}`}
+                    className={`absolute ${isCountIn ? 'animate-note-drop' : 'note-static'}`}
+                    style={noteStyle}
+                  >
+                    <NoteImage
+                      noteValue={noteValue}
+                      size={noteSize}
+                      className="drop-shadow-xl"
+                    />
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

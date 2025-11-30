@@ -69,11 +69,18 @@ export function PlayingView() {
 
   const onTapStart = (e: React.TouchEvent | React.MouseEvent) => {
     const now = Date.now();
+    const eventType = 'type' in e ? 'touch' : 'mouse';
+    const timeSinceLastTap = now - lastTapTimeRef.current;
+    
+    console.log(`[TAP] Event: ${eventType}, Time since last: ${timeSinceLastTap}ms, Will process: ${timeSinceLastTap >= TAP_DEBOUNCE_MS || lastTapTimeRef.current === 0}`);
+    
     if (now - lastTapTimeRef.current < TAP_DEBOUNCE_MS) {
       // Ignore this tap - it's a duplicate
+      console.log('[TAP] IGNORED - too soon after previous tap');
       return;
     }
     lastTapTimeRef.current = now;
+    console.log('[TAP] PROCESSING tap');
     handleTap();
   };
 

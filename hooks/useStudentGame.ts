@@ -139,6 +139,9 @@ export function useStudentGame() {
     }
 
     const tapTime = getSyncedTime();
+    const interval = previousTapTimeRef.current ? tapTime - previousTapTimeRef.current : 0;
+    
+    console.log(`[HANDLE_TAP] Tap registered at ${tapTime}, interval: ${interval}ms, previous: ${previousTapTimeRef.current}`);
 
     // Determine which segment to use for timing calculation
     const isFirstTapInSegment = tapsInCurrentSegmentRef.current === 0;
@@ -151,12 +154,16 @@ export function useStudentGame() {
     const beatDuration = 60 / (gameData?.config.tempo || 120); // seconds per beat
     const expectedInterval = (beatDuration / noteInfo.tapsPerBeat) * 1000; // ms between taps
 
+    console.log(`[HANDLE_TAP] Expected interval: ${expectedInterval.toFixed(2)}ms, Note: ${segmentForCalculation.noteValue}`);
+
     // Calculate accuracy using rhythm engine
     const tapResult = rhythmEngineRef.current.calculateTapAccuracy(
       tapTime,
       previousTapTimeRef.current,
       expectedInterval
     );
+
+    console.log(`[HANDLE_TAP] Accuracy: ${tapResult.accuracy.toFixed(2)}ms, Interval: ${tapResult.interval}ms`);
 
     // Create tap event
     const tapEvent: TapEvent = {
@@ -202,7 +209,7 @@ export function useStudentGame() {
 
     // Clear feedback
     setTimeout(() => setFeedback(null), 100);
-  }, [isPlaying, getSyncedTime, addTap, roomCode, previewMode]);
+  }, [isPlaying, getSyncedTime, addTap, roomCode, previewMode, gameData]);
 
   return {
     isPlaying,
