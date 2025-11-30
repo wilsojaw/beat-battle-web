@@ -118,7 +118,7 @@ export function StaffTimeline({ noteValue, measuresPerSegment, isCountIn, tempo 
 
   return (
     <div className="w-full max-w-xl mx-auto">
-      <div className="relative w-full overflow-hidden">
+      <div className="relative w-full">
         <div className="relative w-full" style={{ paddingBottom: '55%' }}>
           <Lottie
             animationData={staffAnimation}
@@ -218,7 +218,6 @@ export function StaffTimeline({ noteValue, measuresPerSegment, isCountIn, tempo 
                   style={{
                     left: `${note.position * 100}%`,
                     top: noteTop,
-                    transform: 'translateX(-50%)',
                     ...(isCountIn ? {
                       animationDuration: `${noteDropDurationMs}ms`,
                       animationDelay: `${noteStartDelayMs + (noteStaggerMs * index)}ms`,
