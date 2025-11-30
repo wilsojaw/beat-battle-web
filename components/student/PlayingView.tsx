@@ -32,12 +32,15 @@ export function PlayingView() {
 
   const { isPlaying, feedback, currentAccuracy, handleTap } = useStudentGame();
 
-  console.log('[PlayingView] Rendering with:', { 
-    isPlaying, 
-    currentSegment: currentSegment?.noteValue, 
-    currentMeasure,
-    hasGameConfig: !!gameConfig 
-  });
+  if (typeof window !== 'undefined') {
+    console.log('[PlayingView] Rendering with:', {
+      isPlaying,
+      currentSegment: currentSegment?.noteValue,
+      currentMeasure,
+      hasGameConfig: !!gameConfig,
+      view: useStudentStore.getState().view,
+    });
+  }
 
   if (!isPlaying) {
     return (
@@ -82,7 +85,14 @@ export function PlayingView() {
       const eventType = 'type' in e ? 'touch' : 'mouse';
       const timeSinceLastTap = now - lastTapTimeRef.current;
       
-      console.log(`[TAP] Event: ${eventType}, Time since last: ${timeSinceLastTap}ms, Will process: ${timeSinceLastTap >= TAP_DEBOUNCE_MS || lastTapTimeRef.current === 0}`);
+      console.log('[TAP] Event:', {
+        eventType,
+        timeSinceLastTap,
+        willProcess: timeSinceLastTap >= TAP_DEBOUNCE_MS || lastTapTimeRef.current === 0,
+        isPlaying,
+        currentSegment: currentSegment?.noteValue,
+        gameConfigTempo: gameConfig?.tempo,
+      });
       
       if (now - lastTapTimeRef.current < TAP_DEBOUNCE_MS) {
         // Ignore this tap - it's a duplicate
