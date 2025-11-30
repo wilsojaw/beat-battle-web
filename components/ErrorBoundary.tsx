@@ -87,17 +87,17 @@ export class ErrorBoundary extends Component<Props, State> {
               </p>
             </div>
 
-            {/* Error Details (only in development) */}
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {/* Error Details */}
+            {this.state.error && (
               <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-6 text-left">
-                <h3 className="font-bold text-red-800 mb-2">Error Details:</h3>
-                <pre className="text-xs text-red-700 overflow-auto max-h-40">
+                <h3 className="font-bold text-red-800 mb-2">Error Details (temporary debug):</h3>
+                <pre className="text-xs text-red-700 overflow-auto max-h-40 whitespace-pre-wrap break-all">
                   {this.state.error.toString()}
                 </pre>
                 {this.state.errorInfo && (
                   <>
                     <h3 className="font-bold text-red-800 mt-4 mb-2">Stack Trace:</h3>
-                    <pre className="text-xs text-red-700 overflow-auto max-h-60">
+                    <pre className="text-xs text-red-700 overflow-auto max-h-60 whitespace-pre-wrap break-all">
                       {this.state.errorInfo.componentStack}
                     </pre>
                   </>
