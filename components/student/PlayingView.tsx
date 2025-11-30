@@ -68,22 +68,26 @@ export function PlayingView() {
   const TAP_DEBOUNCE_MS = 150; // Ignore taps within 150ms of each other
 
   const onTapStart = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault(); // Prevent default to avoid ghost clicks
-    
-    const now = Date.now();
-    const eventType = 'type' in e ? 'touch' : 'mouse';
-    const timeSinceLastTap = now - lastTapTimeRef.current;
-    
-    console.log(`[TAP] Event: ${eventType}, Time since last: ${timeSinceLastTap}ms, Will process: ${timeSinceLastTap >= TAP_DEBOUNCE_MS || lastTapTimeRef.current === 0}`);
-    
-    if (now - lastTapTimeRef.current < TAP_DEBOUNCE_MS) {
-      // Ignore this tap - it's a duplicate
-      console.log('[TAP] IGNORED - too soon after previous tap');
-      return;
+    try {
+      e.preventDefault(); // Prevent default to avoid ghost clicks
+      
+      const now = Date.now();
+      const eventType = 'type' in e ? 'touch' : 'mouse';
+      const timeSinceLastTap = now - lastTapTimeRef.current;
+      
+      console.log(`[TAP] Event: ${eventType}, Time since last: ${timeSinceLastTap}ms, Will process: ${timeSinceLastTap >= TAP_DEBOUNCE_MS || lastTapTimeRef.current === 0}`);
+      
+      if (now - lastTapTimeRef.current < TAP_DEBOUNCE_MS) {
+        // Ignore this tap - it's a duplicate
+        console.log('[TAP] IGNORED - too soon after previous tap');
+        return;
+      }
+      lastTapTimeRef.current = now;
+      console.log('[TAP] PROCESSING tap');
+      handleTap();
+    } catch (error) {
+      console.error('[TAP] Error in tap handler:', error);
     }
-    lastTapTimeRef.current = now;
-    console.log('[TAP] PROCESSING tap');
-    handleTap();
   };
 
   return (

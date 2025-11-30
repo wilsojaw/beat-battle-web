@@ -41,6 +41,12 @@ export function useStudentGame() {
   const tapsInCurrentSegmentRef = useRef<number>(0);
   const measureIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const gameInitializedRef = useRef<boolean>(false); // Track if game has been initialized
+  const gameDataRef = useRef(gameData); // Store gameData in ref to avoid dependency issues
+
+  // Update gameData ref when it changes
+  useEffect(() => {
+    gameDataRef.current = gameData;
+  }, [gameData]);
 
   // Get synchronized server time
   const getSyncedTime = useCallback(() => {
@@ -151,7 +157,7 @@ export function useStudentGame() {
 
     // Calculate expected interval based on note value
     const noteInfo = NOTE_VALUES[segmentForCalculation.noteValue];
-    const beatDuration = 60 / (gameData?.config.tempo || 120); // seconds per beat
+    const beatDuration = 60 / (gameDataRef.current?.config.tempo || 120); // seconds per beat
     const expectedInterval = (beatDuration / noteInfo.tapsPerBeat) * 1000; // ms between taps
 
     console.log(`[HANDLE_TAP] Expected interval: ${expectedInterval.toFixed(2)}ms, Note: ${segmentForCalculation.noteValue}`);
@@ -209,7 +215,7 @@ export function useStudentGame() {
 
     // Clear feedback
     setTimeout(() => setFeedback(null), 100);
-  }, [isPlaying, getSyncedTime, addTap, roomCode, previewMode, gameData]);
+  }, [isPlaying, getSyncedTime, addTap, roomCode, previewMode]);
 
   return {
     isPlaying,
