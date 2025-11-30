@@ -32,6 +32,13 @@ export function PlayingView() {
 
   const { isPlaying, feedback, currentAccuracy, handleTap } = useStudentGame();
 
+  console.log('[PlayingView] Rendering with:', { 
+    isPlaying, 
+    currentSegment: currentSegment?.noteValue, 
+    currentMeasure,
+    hasGameConfig: !!gameConfig 
+  });
+
   if (!isPlaying) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center p-4">
