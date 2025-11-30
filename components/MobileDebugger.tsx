@@ -15,6 +15,27 @@ export function MobileDebugger() {
       return;
     }
 
+    function logGlobalError(event: ErrorEvent) {
+      console.error('[MobileDebugger] Global error:', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error,
+        stack: event.error?.stack,
+      });
+    }
+
+    function logUnhandledRejection(event: PromiseRejectionEvent) {
+      console.error('[MobileDebugger] Unhandled rejection:', {
+        reason: event.reason,
+        stack: event.reason?.stack,
+      });
+    }
+
+    window.addEventListener('error', logGlobalError);
+    window.addEventListener('unhandledrejection', logUnhandledRejection);
+
     // Load Eruda script
     const script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/eruda';
@@ -27,6 +48,8 @@ export function MobileDebugger() {
     document.body.appendChild(script);
 
     return () => {
+      window.removeEventListener('error', logGlobalError);
+      window.removeEventListener('unhandledrejection', logUnhandledRejection);
       // Cleanup
       if (window.eruda) {
         window.eruda.destroy();
