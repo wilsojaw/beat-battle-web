@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { useStudentStore } from '@/store/studentStore';
 import { useStudentGame } from '@/hooks/useStudentGame';
 import { NOTE_VALUES } from '@/types/game';
@@ -61,12 +62,18 @@ export function PlayingView() {
     currentSegment.durationBars ||
     1;
 
-  // Prevent double-firing on touch devices (onTouchStart and onMouseDown both fire)
+  // Debounce to prevent double-firing on touch devices
+  // (onTouchStart and onMouseDown both fire, ~100ms apart)
+  const lastTapTimeRef = useRef<number>(0);
+  const TAP_DEBOUNCE_MS = 150; // Ignore taps within 150ms of each other
+
   const onTapStart = (e: React.TouchEvent | React.MouseEvent) => {
-    // On touch devices, prevent the subsequent mousedown from also firing
-    if (e.type === 'touchstart') {
-      e.preventDefault();
+    const now = Date.now();
+    if (now - lastTapTimeRef.current < TAP_DEBOUNCE_MS) {
+      // Ignore this tap - it's a duplicate
+      return;
     }
+    lastTapTimeRef.current = now;
     handleTap();
   };
 
