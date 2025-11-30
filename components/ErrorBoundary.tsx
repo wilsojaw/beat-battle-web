@@ -34,12 +34,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Log error details with more context
+    // Log error details
     console.error('[ErrorBoundary] Caught error:', error);
-    console.error('[ErrorBoundary] Error message:', error.message);
-    console.error('[ErrorBoundary] Error stack:', error.stack);
     console.error('[ErrorBoundary] Error info:', errorInfo);
-    console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
 
     // Update state with error details
     this.setState({
@@ -87,17 +84,17 @@ export class ErrorBoundary extends Component<Props, State> {
               </p>
             </div>
 
-            {/* Error Details */}
-            {this.state.error && (
+            {/* Error Details (only in development) */}
+            {process.env.NODE_ENV === 'development' && this.state.error && (
               <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-6 text-left">
-                <h3 className="font-bold text-red-800 mb-2">Error Details (temporary debug):</h3>
-                <pre className="text-xs text-red-700 overflow-auto max-h-40 whitespace-pre-wrap break-all">
+                <h3 className="font-bold text-red-800 mb-2">Error Details:</h3>
+                <pre className="text-xs text-red-700 overflow-auto max-h-40">
                   {this.state.error.toString()}
                 </pre>
                 {this.state.errorInfo && (
                   <>
                     <h3 className="font-bold text-red-800 mt-4 mb-2">Stack Trace:</h3>
-                    <pre className="text-xs text-red-700 overflow-auto max-h-60 whitespace-pre-wrap break-all">
+                    <pre className="text-xs text-red-700 overflow-auto max-h-60">
                       {this.state.errorInfo.componentStack}
                     </pre>
                   </>

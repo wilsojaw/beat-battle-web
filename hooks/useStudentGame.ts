@@ -41,12 +41,6 @@ export function useStudentGame() {
   const tapsInCurrentSegmentRef = useRef<number>(0);
   const measureIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const gameInitializedRef = useRef<boolean>(false); // Track if game has been initialized
-  const gameDataRef = useRef(gameData); // Store gameData in ref to avoid dependency issues
-
-  // Update gameData ref when it changes
-  useEffect(() => {
-    gameDataRef.current = gameData;
-  }, [gameData]);
 
   // Get synchronized server time
   const getSyncedTime = useCallback(() => {
@@ -145,9 +139,6 @@ export function useStudentGame() {
     }
 
     const tapTime = getSyncedTime();
-    const interval = previousTapTimeRef.current ? tapTime - previousTapTimeRef.current : 0;
-    
-    console.log(`[HANDLE_TAP] Tap registered at ${tapTime}, interval: ${interval}ms, previous: ${previousTapTimeRef.current}`);
 
     // Determine which segment to use for timing calculation
     const isFirstTapInSegment = tapsInCurrentSegmentRef.current === 0;
@@ -157,10 +148,8 @@ export function useStudentGame() {
 
     // Calculate expected interval based on note value
     const noteInfo = NOTE_VALUES[segmentForCalculation.noteValue];
-    const beatDuration = 60 / (gameDataRef.current?.config.tempo || 120); // seconds per beat
+    const beatDuration = 60 / (gameData?.config.tempo || 120); // seconds per beat
     const expectedInterval = (beatDuration / noteInfo.tapsPerBeat) * 1000; // ms between taps
-
-    console.log(`[HANDLE_TAP] Expected interval: ${expectedInterval.toFixed(2)}ms, Note: ${segmentForCalculation.noteValue}`);
 
     // Calculate accuracy using rhythm engine
     const tapResult = rhythmEngineRef.current.calculateTapAccuracy(
@@ -168,8 +157,6 @@ export function useStudentGame() {
       previousTapTimeRef.current,
       expectedInterval
     );
-
-    console.log(`[HANDLE_TAP] Accuracy: ${tapResult.accuracy.toFixed(2)}ms, Interval: ${tapResult.interval}ms`);
 
     // Create tap event
     const tapEvent: TapEvent = {

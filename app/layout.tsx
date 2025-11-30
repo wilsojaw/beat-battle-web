@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { SocketManager } from "@/components/SocketManager";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { MobileDebugger } from "@/components/MobileDebugger";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,7 +22,6 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet" />
       </head>
       <body className="antialiased">
-        <MobileDebugger />
         <ErrorBoundary>
           <SocketManager>
             <ConnectionStatus />

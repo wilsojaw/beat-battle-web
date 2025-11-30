@@ -1,6 +1,5 @@
 'use client';
 
-import { useRef } from 'react';
 import { useStudentStore } from '@/store/studentStore';
 import { useStudentGame } from '@/hooks/useStudentGame';
 import { NOTE_VALUES } from '@/types/game';
@@ -32,16 +31,6 @@ export function PlayingView() {
 
   const { isPlaying, feedback, currentAccuracy, handleTap } = useStudentGame();
 
-  if (typeof window !== 'undefined') {
-    console.log('[PlayingView] Rendering with:', {
-      isPlaying,
-      currentSegment: currentSegment?.noteValue,
-      currentMeasure,
-      hasGameConfig: !!gameConfig,
-      view: useStudentStore.getState().view,
-    });
-  }
-
   if (!isPlaying) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex items-center justify-center p-4">
@@ -72,45 +61,10 @@ export function PlayingView() {
     currentSegment.durationBars ||
     1;
 
-  // Debounce to prevent double-firing on touch devices
-  // (onTouchStart and onMouseDown both fire, ~100ms apart)
-  const lastTapTimeRef = useRef<number>(0);
-  const TAP_DEBOUNCE_MS = 150; // Ignore taps within 150ms of each other
-
-  const onTapStart = (e: React.TouchEvent | React.MouseEvent) => {
-    try {
-      e.preventDefault(); // Prevent default to avoid ghost clicks
-      
-      const now = Date.now();
-      const eventType = 'type' in e ? 'touch' : 'mouse';
-      const timeSinceLastTap = now - lastTapTimeRef.current;
-      
-      console.log('[TAP] Event:', {
-        eventType,
-        timeSinceLastTap,
-        willProcess: timeSinceLastTap >= TAP_DEBOUNCE_MS || lastTapTimeRef.current === 0,
-        isPlaying,
-        currentSegment: currentSegment?.noteValue,
-        gameConfigTempo: gameConfig?.tempo,
-      });
-      
-      if (now - lastTapTimeRef.current < TAP_DEBOUNCE_MS) {
-        // Ignore this tap - it's a duplicate
-        console.log('[TAP] IGNORED - too soon after previous tap');
-        return;
-      }
-      lastTapTimeRef.current = now;
-      console.log('[TAP] PROCESSING tap');
-      handleTap();
-    } catch (error) {
-      console.error('[TAP] Error in tap handler:', error);
-    }
-  };
-
   return (
     <div
-      onTouchStart={onTapStart}
-      onMouseDown={onTapStart}
+      onTouchStart={handleTap}
+      onMouseDown={handleTap}
       className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center justify-between cursor-pointer select-none relative overflow-hidden"
     >
       {/* Feedback Animation */}
