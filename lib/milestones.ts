@@ -8,9 +8,9 @@ const GREAT_TAP_THRESHOLD = 50;
 // Milestone configurations
 export const MILESTONE_CONFIG = {
   streak: {
-    3: { icon: '🔥', messages: ['{name} is warming up!', '{name} found the groove!'] },
-    5: { icon: '🔥🔥', messages: ['{name} is on fire!', '{name} can\'t miss!'] },
-    10: { icon: '🔥🔥🔥', messages: ['{name} is UNSTOPPABLE!', '{name} is IN THE ZONE!'] },
+    3: { icon: '', messages: ['{name} is warming up!', '{name} found the groove!'] },
+    5: { icon: '', messages: ['{name} is on fire!', '{name} can\'t miss!'] },
+    10: { icon: '', messages: ['{name} is UNSTOPPABLE!', '{name} is IN THE ZONE!'] },
     15: { icon: '⭐', messages: ['{name} has a PERFECT STREAK!', '{name} is a RHYTHM GOD!'] }
   },
   accuracy: {
@@ -26,7 +26,7 @@ export const MILESTONE_CONFIG = {
   },
   recovery: {
     comeback: { icon: '💪', messages: ['{name} is making a comeback!', '{name} turned it around!'] },
-    phoenix: { icon: '🔥', messages: ['{name} rose from the ashes!', '{name} is back in it!'] }
+    phoenix: { icon: '💪', messages: ['{name} rose from the ashes!', '{name} is back in it!'] }
   },
   noteSpecific: {
     mastery: { icon: '🎼', message: 'You mastered {noteType}!' }

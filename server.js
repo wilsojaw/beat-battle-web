@@ -22,9 +22,9 @@ const COOLDOWN_GLOBAL_BROADCAST = 3000; // 3 seconds
 
 const MILESTONE_CONFIG = {
   streak: {
-    3: { icon: '🔥', messages: ['{name} is warming up!', '{name} found the groove!'] },
-    5: { icon: '🔥🔥', messages: ['{name} is on fire!', '{name} can\'t miss!'] },
-    10: { icon: '🔥🔥🔥', messages: ['{name} is UNSTOPPABLE!', '{name} is IN THE ZONE!'] },
+    3: { icon: '', messages: ['{name} is warming up!', '{name} found the groove!'] },
+    5: { icon: '', messages: ['{name} is on fire!', '{name} can\'t miss!'] },
+    10: { icon: '', messages: ['{name} is UNSTOPPABLE!', '{name} is IN THE ZONE!'] },
     15: { icon: '⭐', messages: ['{name} has a PERFECT STREAK!', '{name} is a RHYTHM GOD!'] }
   },
   accuracy: {
@@ -319,28 +319,64 @@ function generateGameSegments(config) {
   // Use segmentPattern if provided (for songs with specific choreography)
   // Otherwise cycle through noteValues
   const usePattern = config.segmentPattern && config.segmentPattern.length > 0;
-  const noteSource = usePattern ? config.segmentPattern : config.noteValues;
-
+  
   let currentMeasure = 0;
-  let noteValueIndex = 0;
+  let segmentIndex = 0;
 
-  while (currentMeasure < totalMeasures) {
-    const noteValue = noteSource[noteValueIndex % noteSource.length];
-    const startBeat = currentMeasure * beatsPerMeasure;
-    const endMeasure = Math.min(currentMeasure + measuresPerSegment, totalMeasures);
-    const endBeat = endMeasure * beatsPerMeasure;
+  if (usePattern) {
+    // Use explicit segment pattern (each segment can have different measures)
+    const pattern = config.segmentPattern;
+    
+    while (currentMeasure < totalMeasures && segmentIndex < pattern.length) {
+      const segmentDef = pattern[segmentIndex];
+      const segmentMeasures = Math.min(segmentDef.measures, totalMeasures - currentMeasure);
+      
+      if (segmentMeasures <= 0) break; // No more measures available
+      
+      const startBeat = currentMeasure * beatsPerMeasure;
+      const endMeasure = currentMeasure + segmentMeasures;
+      const endBeat = endMeasure * beatsPerMeasure;
 
-    segments.push({
-      noteValue,
-      startTime: (startBeat * beatDuration * 1000) + countInOffset, // ms (offset by count-in)
-      endTime: (endBeat * beatDuration * 1000) + countInOffset, // ms (offset by count-in)
-      durationBars: endMeasure - currentMeasure,
-      startMeasure: currentMeasure + 1, // 1-indexed for display
-      endMeasure: endMeasure
-    });
+      segments.push({
+        noteValue: segmentDef.noteValue,
+        startTime: (startBeat * beatDuration * 1000) + countInOffset, // ms (offset by count-in)
+        endTime: (endBeat * beatDuration * 1000) + countInOffset, // ms (offset by count-in)
+        durationBars: segmentMeasures,
+        startMeasure: currentMeasure + 1, // 1-indexed for display
+        endMeasure: endMeasure
+      });
 
-    currentMeasure = endMeasure;
-    noteValueIndex++;
+      currentMeasure = endMeasure;
+      segmentIndex++;
+      
+      // If pattern is shorter than total measures, repeat from beginning
+      if (segmentIndex >= pattern.length && currentMeasure < totalMeasures) {
+        segmentIndex = 0; // Loop back to start of pattern
+      }
+    }
+  } else {
+    // Original behavior: cycle through noteValues with fixed measuresPerSegment
+    const noteValues = config.noteValues;
+    let noteValueIndex = 0;
+
+    while (currentMeasure < totalMeasures) {
+      const noteValue = noteValues[noteValueIndex % noteValues.length];
+      const startBeat = currentMeasure * beatsPerMeasure;
+      const endMeasure = Math.min(currentMeasure + measuresPerSegment, totalMeasures);
+      const endBeat = endMeasure * beatsPerMeasure;
+
+      segments.push({
+        noteValue,
+        startTime: (startBeat * beatDuration * 1000) + countInOffset, // ms (offset by count-in)
+        endTime: (endBeat * beatDuration * 1000) + countInOffset, // ms (offset by count-in)
+        durationBars: endMeasure - currentMeasure,
+        startMeasure: currentMeasure + 1, // 1-indexed for display
+        endMeasure: endMeasure
+      });
+
+      currentMeasure = endMeasure;
+      noteValueIndex++;
+    }
   }
 
   console.log(`Generated ${segments.length} segments from ${totalMeasures} measures (${measuresPerSegment} measures per segment)${usePattern ? ' using segment pattern' : ''}`);

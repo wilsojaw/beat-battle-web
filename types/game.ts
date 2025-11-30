@@ -96,7 +96,10 @@ export interface GameConfig {
   songName?: string;
   timeSignature?: TimeSignature; // Time signature (default 4/4)
   audio?: AudioMetadata; // Audio configuration (if using a song)
-  segmentPattern?: NoteValue[]; // Specific order of note values (for songs with choreography)
+  segmentPattern?: Array<{ // Explicit segment pattern with note values and measures
+    noteValue: NoteValue;
+    measures: number;
+  }>;
 }
 
 export interface Player {

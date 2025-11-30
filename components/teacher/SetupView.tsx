@@ -270,7 +270,9 @@ export function SetupView() {
                 </label>
                 {hasLockedNotes && selectedSong.segmentPattern && (
                   <div className="mb-2 p-2 bg-blue-50 rounded-lg border border-blue-100 text-xs text-blue-700">
-                    <strong>Pattern:</strong> {selectedSong.segmentPattern.map(n => NOTE_VALUES[n].displayName).join(' → ')}
+                    <strong>Pattern:</strong> {selectedSong.segmentPattern.map((seg, i) => 
+                      `${NOTE_VALUES[seg.noteValue].displayName} (${seg.measures}${seg.measures === 1 ? ' measure' : ' measures'})`
+                    ).join(' → ')}
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">

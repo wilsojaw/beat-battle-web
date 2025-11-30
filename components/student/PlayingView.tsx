@@ -64,7 +64,7 @@ export function PlayingView() {
   return (
     <div
       onClick={handleTap}
-      className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center cursor-pointer select-none relative overflow-hidden"
+      className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center justify-between cursor-pointer select-none relative overflow-hidden"
     >
       {/* Feedback Animation */}
       {feedback && (
@@ -82,8 +82,10 @@ export function PlayingView() {
       {/* Milestone Toast Notifications */}
       <MilestoneToast milestones={milestones} />
 
-      {/* Leaderboard Panel */}
-      <LeaderboardPanel leaderboard={leaderboard} />
+      {/* Leaderboard Panel - Desktop (top right) */}
+      <div className="hidden sm:block absolute top-28 md:top-[350px] lg:top-28 right-4">
+        <LeaderboardPanel leaderboard={leaderboard} />
+      </div>
 
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 bg-black/20 backdrop-blur-sm p-2 sm:p-4">
@@ -104,7 +106,7 @@ export function PlayingView() {
             {personalStats && (
               <div className="text-[10px] sm:text-xs text-white/80 mt-0.5 sm:mt-1">
                 {personalStats.currentStreak >= 3 && (
-                  <span className="mr-1 sm:mr-2">🔥{personalStats.currentStreak}</span>
+                  <span className="mr-1 sm:mr-2">{personalStats.currentStreak}</span>
                 )}
                 {personalStats.currentRank > 0 && (
                   <span>#{personalStats.currentRank}</span>
@@ -115,18 +117,26 @@ export function PlayingView() {
         </div>
       </div>
 
-      {/* Staff Timeline */}
-      <div className="w-full px-2 sm:px-4 mb-0 sm:mb-1 mt-8 sm:mt-12">
-        <StaffTimeline
-          noteValue={currentSegment.noteValue}
-          measuresPerSegment={measuresPerSegment}
-          isCountIn={currentMeasure === 0}
-          tempo={gameConfig?.tempo}
-        />
+      {/* Top Section: Staff + Leaderboard */}
+      <div className="w-full pt-12 sm:pt-16">
+        {/* Staff Timeline */}
+        <div className="w-full px-2 sm:px-4">
+          <StaffTimeline
+            noteValue={currentSegment.noteValue}
+            measuresPerSegment={measuresPerSegment}
+            isCountIn={currentMeasure === 0}
+            tempo={gameConfig?.tempo}
+          />
+        </div>
+
+        {/* Leaderboard Panel - Mobile only (below staff) */}
+        <div className="w-full px-2 sm:hidden -mt-10">
+          <LeaderboardPanel leaderboard={leaderboard} />
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="text-center text-white px-2 sm:px-4">
+      <div className="text-center text-white px-2 sm:px-4 flex-1 flex flex-col justify-center">
         {/* Note Symbol */}
         <div className="flex justify-center mb-1 sm:mb-2 animate-pulse">
           <div className="w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] md:w-[200px] md:h-[200px] relative">
@@ -151,23 +161,25 @@ export function PlayingView() {
         </p>
 
         {/* Tap Instruction */}
-        <p className="text-base sm:text-xl text-white/80 animate-bounce">
-          👆 Tap anywhere to play!
+        <p className="text-base sm:text-xl text-white/80">
+          Tap anywhere to play!
         </p>
       </div>
 
-      {/* Next Note Preview */}
-      {showNextNote && nextSegment && (
-        <div className="w-full text-center px-2 mt-8 sm:mt-12">
-          <div className="inline-block bg-white/20 backdrop-blur-sm px-4 sm:px-8 py-2 sm:py-4 rounded-2xl">
-            <div className="text-white/60 text-xs sm:text-sm mb-1 sm:mb-2">Next Up</div>
-            <div className="flex justify-center mb-2">
-              <NoteImage noteValue={nextSegment.noteValue} size={64} className="sm:w-16 sm:h-16" />
+      {/* Bottom Section: Next Note Preview */}
+      <div className="w-full pb-4 sm:pb-8">
+        {showNextNote && nextSegment && (
+          <div className="w-full text-center px-2">
+            <div className="inline-block bg-white/20 backdrop-blur-sm px-[clamp(8px,2vw,32px)] py-[clamp(4px,1vw,16px)] sm:px-8 sm:py-4 rounded-xl sm:rounded-2xl">
+              <div className="text-white/60 text-[clamp(10px,2.5vw,14px)] sm:text-sm mb-0.5 sm:mb-2">Next Up</div>
+              <div className="flex justify-center mb-1 sm:mb-2">
+                <NoteImage noteValue={nextSegment.noteValue} size={32} className="w-[clamp(32px,8vw,48px)] h-[clamp(32px,8vw,48px)] sm:w-16 sm:h-16" />
+              </div>
+              <div className="text-white/80 text-[clamp(10px,2.5vw,14px)] sm:text-lg mt-0.5 sm:mt-2">{NOTE_VALUES[nextSegment.noteValue].displayName}</div>
             </div>
-            <div className="text-white/80 text-sm sm:text-lg mt-1 sm:mt-2">{NOTE_VALUES[nextSegment.noteValue].displayName}</div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -114,16 +114,6 @@ export function LobbyView() {
             </div>
           )}
 
-          <div className="bg-white/70 rounded-2xl p-5 text-left text-sm text-gray-600">
-            <p className="font-semibold text-gray-900 mb-2">Quick Tips</p>
-            <ul className="space-y-2">
-              <li>• Tap anywhere on the screen when the game starts</li>
-              <li>• Match the rhythm shown and stay with the beat</li>
-              <li>• Keep your device steady to avoid false taps</li>
-              <li>• Have fun and cheer on your classmates!</li>
-            </ul>
-          </div>
-
           <div className="flex justify-center gap-3 pt-2">
             <div className="w-2.5 h-2.5 bg-purple-500 rounded-full animate-bounce" />
             <div className="w-2.5 h-2.5 bg-pink-500 rounded-full animate-bounce delay-100" />

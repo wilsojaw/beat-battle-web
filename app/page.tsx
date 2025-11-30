@@ -12,14 +12,14 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row gap-6 justify-center">
           <Link
             href="/teacher"
-            className="bg-white text-purple-600 px-8 py-4 rounded-xl text-xl font-semibold hover:bg-purple-50 transition-all transform hover:scale-105 shadow-lg"
+            className="bg-white text-purple-600 px-4 py-4 sm:px-8 rounded-xl text-lg sm:text-xl font-semibold hover:bg-purple-50 transition-all transform hover:scale-105 shadow-lg w-48 sm:w-auto mx-auto sm:mx-0"
           >
             🎓 I'm a Teacher
           </Link>
 
           <Link
             href="/student"
-            className="bg-white text-pink-600 px-8 py-4 rounded-xl text-xl font-semibold hover:bg-pink-50 transition-all transform hover:scale-105 shadow-lg"
+            className="bg-white text-pink-600 px-4 py-4 sm:px-8 rounded-xl text-lg sm:text-xl font-semibold hover:bg-pink-50 transition-all transform hover:scale-105 shadow-lg w-48 sm:w-auto mx-auto sm:mx-0"
           >
             🎵 I'm a Student
           </Link>

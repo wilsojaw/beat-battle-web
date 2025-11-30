@@ -57,8 +57,8 @@ export function JoiningView() {
   };
 
   const handleRoomCodeChange = (value: string) => {
-    // Auto-uppercase and limit to 6 characters
-    setRoomCode(value.toUpperCase().slice(0, 6));
+    // Auto-uppercase and limit to 4 characters
+    setRoomCode(value.toUpperCase().slice(0, 4));
   };
 
   const goToHome = () => {
@@ -118,16 +118,16 @@ export function JoiningView() {
               type="text"
               value={roomCode}
               onChange={(e) => handleRoomCodeChange(e.target.value)}
-              placeholder="6-digit code"
+              placeholder="4-digit code"
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none text-2xl font-bold text-center tracking-widest uppercase text-gray-900 placeholder:text-gray-400"
               disabled={loading}
-              maxLength={6}
+              maxLength={4}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') joinGame();
               }}
             />
             <p className="text-sm text-gray-500 mt-2">
-              Ask your teacher for the 6-character room code
+              Ask your teacher for the 4-character room code
             </p>
           </div>
         </div>
@@ -149,16 +149,6 @@ export function JoiningView() {
           >
             Back
           </button>
-        </div>
-
-        {/* Tips */}
-        <div className="mt-8 bg-blue-50 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">💡 Quick Tips:</h3>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Get the room code from your teacher's screen</li>
-            <li>• Make sure you're connected to the internet</li>
-            <li>• Use headphones for the best experience</li>
-          </ul>
         </div>
       </div>
     </div>

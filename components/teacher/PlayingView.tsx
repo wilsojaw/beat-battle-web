@@ -360,7 +360,7 @@ export function PlayingView() {
                           {player.accuracy}%
                         </div>
                         {player.hasStreak && (
-                          <div className="text-xl">🔥</div>
+                          <div className="text-xl"></div>
                         )}
                       </div>
                     </div>

@@ -29,8 +29,11 @@ export interface Song {
   
   // Locked settings (when song has specific choreography)
   lockedNoteValues?: NoteValue[];        // If set, these note values are forced and cannot be changed
-  lockedMeasuresPerSegment?: number;     // If set, measures per segment is locked
-  segmentPattern?: NoteValue[];          // Specific order of note values for each segment
+  lockedMeasuresPerSegment?: number;     // If set, measures per segment is locked (if segmentPattern not used)
+  segmentPattern?: Array<{               // Explicit segment pattern with note values and measures
+    noteValue: NoteValue;
+    measures: number;
+  }>;
 }
 
 // The "No Song" option - metronome only
@@ -70,7 +73,13 @@ export const SONGS: Song[] = [
     // This song has specific choreography - lock the settings
     lockedNoteValues: ['quarter', 'half', 'whole', 'eighth'],
     lockedMeasuresPerSegment: 4,
-    segmentPattern: ['quarter', 'half', 'whole', 'eighth']  // 4 measures each in this order
+    segmentPattern: [
+      { noteValue: 'quarter', measures: 4 },
+      { noteValue: 'half', measures: 4 },
+      { noteValue: 'whole', measures: 4 },
+      { noteValue: 'eighth', measures: 4 },
+      { noteValue: 'quarter', measures: 4 }
+    ]
   }
 ];
 
