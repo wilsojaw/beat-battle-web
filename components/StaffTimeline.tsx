@@ -40,13 +40,13 @@ const NOTE_TOP_OVERRIDES: Partial<Record<NoteValue, string>> = {
   // Add other note types as needed: 'half': '57%', 'quarter': '56%', etc.
 };
 
-// Note size in pixels
-const NOTE_SIZE_DEFAULT = 85; // ← Default note size for all notes
+// Note size as percentage of container width (scales with staff size)
+const NOTE_SIZE_PERCENT_DEFAULT = 14; // ← Default note size (% of container width)
 
-// Note-specific sizes (overrides default)
-const NOTE_SIZE_OVERRIDES: Partial<Record<NoteValue, number>> = {
-  whole: 55, // ← Adjust whole note size here
-  // Add other note types as needed: 'half': 95, 'quarter': 100, etc.
+// Note-specific sizes (overrides default) - as percentage of container width
+const NOTE_SIZE_PERCENT_OVERRIDES: Partial<Record<NoteValue, number>> = {
+  whole: 9, // ← Whole notes are smaller/rounder
+  // Add other note types as needed: 'half': 15, 'quarter': 14, etc.
 };
 
 // Eighth note graphic positioning (for 4_eighth_notes.png)
@@ -71,7 +71,7 @@ export function StaffTimeline({ noteValue, measuresPerSegment, isCountIn, tempo 
 
   // Get note-specific positioning and sizing
   const noteTop = NOTE_TOP_OVERRIDES[noteValue] || NOTE_TOP_DEFAULT;
-  const noteSize = NOTE_SIZE_OVERRIDES[noteValue] || NOTE_SIZE_DEFAULT;
+  const noteSizePercent = NOTE_SIZE_PERCENT_OVERRIDES[noteValue] || NOTE_SIZE_PERCENT_DEFAULT;
 
   // Calculate animation timing based on tempo
   // Count-in is 4 beats, so duration = (60 / tempo) * 4 seconds
@@ -218,6 +218,8 @@ export function StaffTimeline({ noteValue, measuresPerSegment, isCountIn, tempo 
                   style={{
                     left: `${note.position * 100}%`,
                     top: noteTop,
+                    width: `${noteSizePercent}%`,
+                    aspectRatio: '1 / 1', // Square container for notes
                     // Note: transform is handled by CSS classes (animate-note-drop / note-static)
                     // which include translateX(-50%) translateY(-50%) for proper centering
                     ...(isCountIn ? {
@@ -229,8 +231,7 @@ export function StaffTimeline({ noteValue, measuresPerSegment, isCountIn, tempo 
                 >
                   <NoteImage
                     noteValue={noteValue}
-                    size={noteSize}
-                    className="drop-shadow-xl"
+                    className="drop-shadow-xl w-full h-full"
                   />
                 </div>
               ))

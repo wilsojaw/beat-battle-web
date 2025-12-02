@@ -64,7 +64,7 @@ export function PlayingView() {
   return (
     <div
       onPointerDown={handleTap}
-      className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center justify-between cursor-pointer select-none relative overflow-hidden"
+      className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center justify-start sm:justify-between cursor-pointer select-none relative overflow-hidden"
     >
       {/* Feedback Animation */}
       {feedback && (
@@ -136,10 +136,10 @@ export function PlayingView() {
       </div>
 
       {/* Main Content */}
-      <div className="text-center text-white px-2 sm:px-4 sm:flex-1 flex flex-col justify-center">
+      <div className="text-center text-white px-2 sm:px-4 sm:flex-1 flex flex-col justify-center mt-2 sm:mt-0">
         {/* Note Symbol */}
         <div className="flex justify-center mb-1 sm:mb-2 animate-pulse">
-          <div className="w-[120px] h-[120px] sm:w-[160px] sm:h-[160px] md:w-[200px] md:h-[200px] relative">
+          <div className="w-[80px] h-[80px] sm:w-[160px] sm:h-[160px] md:w-[200px] md:h-[200px] relative">
             <Image
               src={noteInfo.imagePath}
               alt={noteInfo.displayName}
@@ -151,31 +151,31 @@ export function PlayingView() {
         </div>
 
         {/* Note Name */}
-        <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-1 sm:mb-2">
+        <h2 className="text-xl sm:text-4xl md:text-5xl font-bold mb-1 sm:mb-2">
           {noteInfo.displayName}
         </h2>
 
         {/* Instructions */}
-        <p className="text-sm sm:text-xl md:text-2xl mb-1 sm:mb-2 bg-white/20 backdrop-blur-sm px-4 sm:px-8 py-2 sm:py-4 rounded-full max-w-md mx-auto">
+        <p className="text-xs sm:text-xl md:text-2xl mb-1 sm:mb-2 bg-white/20 backdrop-blur-sm px-3 sm:px-8 py-1.5 sm:py-4 rounded-full max-w-md mx-auto">
           {noteInfo.description}
         </p>
 
         {/* Tap Instruction */}
-        <p className="text-base sm:text-xl text-white/80">
+        <p className="text-sm sm:text-xl text-white/80">
           Tap anywhere to play!
         </p>
       </div>
 
       {/* Bottom Section: Next Note Preview */}
-      <div className="w-full pb-4 sm:pb-8">
+      <div className="w-full pb-2 sm:pb-8 mt-2 sm:mt-0">
         {showNextNote && nextSegment && (
           <div className="w-full text-center px-2">
-            <div className="inline-block bg-white/20 backdrop-blur-sm px-[clamp(8px,2vw,32px)] py-[clamp(4px,1vw,16px)] sm:px-8 sm:py-4 rounded-xl sm:rounded-2xl">
-              <div className="text-white/60 text-[clamp(10px,2.5vw,14px)] sm:text-sm mb-0.5 sm:mb-2">Next Up</div>
-              <div className="flex justify-center mb-1 sm:mb-2">
-                <NoteImage noteValue={nextSegment.noteValue} size={32} className="w-[clamp(32px,8vw,48px)] h-[clamp(32px,8vw,48px)] sm:w-16 sm:h-16" />
+            <div className="inline-block bg-white/20 backdrop-blur-sm px-[clamp(8px,2vw,32px)] py-[clamp(2px,0.5vw,16px)] sm:px-8 sm:py-4 rounded-xl sm:rounded-2xl">
+              <div className="text-white/60 text-[clamp(9px,2vw,14px)] sm:text-sm mb-0.5 sm:mb-2">Next Up</div>
+              <div className="flex justify-center mb-0.5 sm:mb-2">
+                <NoteImage noteValue={nextSegment.noteValue} size={32} className="w-[clamp(24px,6vw,48px)] h-[clamp(24px,6vw,48px)] sm:w-16 sm:h-16" />
               </div>
-              <div className="text-white/80 text-[clamp(10px,2.5vw,14px)] sm:text-lg mt-0.5 sm:mt-2">{NOTE_VALUES[nextSegment.noteValue].displayName}</div>
+              <div className="text-white/80 text-[clamp(9px,2vw,14px)] sm:text-lg mt-0.5 sm:mt-2">{NOTE_VALUES[nextSegment.noteValue].displayName}</div>
             </div>
           </div>
         )}

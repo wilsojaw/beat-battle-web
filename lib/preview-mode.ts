@@ -22,10 +22,10 @@ const mockGameConfig: GameConfig = {
 };
 
 const mockSegments: GameSegment[] = [
-  { noteValue: 'eighth', startTime: 0, endTime: 16000, durationBars: 2, startMeasure: 1, endMeasure: 2 },
-  { noteValue: 'whole', startTime: 16000, endTime: 32000, durationBars: 2, startMeasure: 3, endMeasure: 4 },
+  { noteValue: 'whole', startTime: 0, endTime: 16000, durationBars: 2, startMeasure: 1, endMeasure: 2 },
+  { noteValue: 'quarter', startTime: 16000, endTime: 32000, durationBars: 2, startMeasure: 3, endMeasure: 4 },
   { noteValue: 'half', startTime: 32000, endTime: 48000, durationBars: 2, startMeasure: 5, endMeasure: 6 },
-  { noteValue: 'quarter', startTime: 48000, endTime: 64000, durationBars: 2, startMeasure: 7, endMeasure: 8 },
+  { noteValue: 'eighth', startTime: 48000, endTime: 64000, durationBars: 2, startMeasure: 7, endMeasure: 8 },
 ];
 
 const tapSample = {
