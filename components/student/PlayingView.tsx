@@ -63,8 +63,7 @@ export function PlayingView() {
 
   return (
     <div
-      onTouchStart={handleTap}
-      onMouseDown={handleTap}
+      onPointerDown={handleTap}
       className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-500 to-pink-500 flex flex-col items-center justify-between cursor-pointer select-none relative overflow-hidden"
     >
       {/* Feedback Animation */}
